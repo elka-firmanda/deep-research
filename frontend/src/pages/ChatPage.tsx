@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw'
 import { Settings as SettingsType, Message, ProgressEvent, ApiStatus, ConversationMessage } from '../lib/types'
 import Sidebar from '../components/Sidebar'
 import { useChat } from '../contexts/ChatContext'
+import { streamManager } from '../lib/streamManager'
 
 interface ChatPageProps {
   settings: SettingsType
@@ -51,9 +52,16 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
               content: m.content,
               timestamp: new Date(m.created_at),
             }))
+            
+            // Only update messages if they're different (avoid losing typing state)
             setMessages(loadedMessages)
-            setIsLoading(false)
-            setCurrentProgress(null)
+            
+            // Only clear loading if we have the expected number of messages (response completed)
+            // User message + assistant response = 2 messages minimum for completed exchange
+            if (loadedMessages.length >= 2 || !isLoading) {
+              setIsLoading(false)
+              setCurrentProgress(null)
+            }
           }
         } catch (error) {
           console.error('Failed to refresh conversation:', error)
@@ -61,8 +69,10 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       }
     }
     
-    refreshConversation()
-  }, [location, conversationId])
+    // Delay slightly to avoid race conditions
+    const timeoutId = setTimeout(refreshConversation, 100)
+    return () => clearTimeout(timeoutId)
+  }, [location.pathname, conversationId])
 
   const sendMessage = async (content: string) => {
     const userMessage: Message = {
@@ -76,6 +86,13 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     setIsLoading(true)
     setCurrentProgress(null)
     setInput('')
+
+    const abortController = new AbortController()
+    const streamId = streamManager.generateId()
+    let streamRegistered = false
+    let finalResponse = ''
+    let buffer = ''
+    let messageAdded = false
 
     try {
       const response = await fetch('/api/chat', {
@@ -94,6 +111,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           deep_research: settings.deepResearch,
           timezone: settings.timezone,
         }),
+        signal: abortController.signal,
       })
 
       if (!response.ok) {
@@ -108,9 +126,9 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         throw new Error('No response body')
       }
 
-      let finalResponse = ''
-      let buffer = ''
-      let messageAdded = false
+      // Register stream with manager to keep it alive even if component unmounts
+      streamManager.startStream(streamId, abortController, reader, conversationId)
+      streamRegistered = true
 
       const processEvent = (event: { type: string; content?: string; step?: string; status?: string; detail?: string; progress?: number; tool?: string; arguments?: unknown; conversation_id?: string }) => {
         switch (event.type) {
@@ -148,7 +166,6 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             break
           
           case 'conversation_id':
-            // Capture the conversation ID from the server
             if (event.conversation_id) {
               setConversationId(event.conversation_id)
             }
@@ -223,16 +240,23 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         setCurrentProgress(null)
       }
     } catch (error) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Error: ' + (error instanceof Error ? error.message : 'Failed to connect to the server.'),
-        timestamp: new Date(),
-        isError: true,
+      // Only show error if it's not an abort (which happens when navigating away)
+      if (!abortController.signal.aborted) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'Error: ' + (error instanceof Error ? error.message : 'Failed to connect to the server.'),
+          timestamp: new Date(),
+          isError: true,
+        }
+        setMessages(prev => [...prev, errorMessage])
+        setCurrentProgress(null)
       }
-      setMessages(prev => [...prev, errorMessage])
-      setCurrentProgress(null)
     } finally {
+      // Clean up stream manager
+      if (streamRegistered) {
+        streamManager.removeStream(streamId)
+      }
       setIsLoading(false)
     }
   }
