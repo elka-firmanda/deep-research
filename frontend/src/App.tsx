@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import ChatPage from './pages/ChatPage'
 import SettingsPage from './pages/SettingsPage'
 import { Settings, ApiStatus } from './lib/types'
+import { ChatProvider } from './contexts/ChatContext'
 
 const DEFAULT_SYSTEM_PROMPT = `You are an expert research assistant that produces comprehensive, well-sourced research reports. Your responses should read like Wikipedia articles or academic research summaries.
 
@@ -138,7 +139,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <ChatProvider>
+        <Routes>
         <Route 
           path="/" 
           element={
@@ -162,6 +164,7 @@ function App() {
           } 
         />
       </Routes>
+      </ChatProvider>
     </BrowserRouter>
   )
 }

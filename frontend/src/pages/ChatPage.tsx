@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Send, Settings, Loader2, Search, Globe, FileText, CheckCircle2, Circle, ArrowRight, Sparkles, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import { Settings as SettingsType, Message, ProgressEvent, ApiStatus, ConversationMessage } from '../lib/types'
 import Sidebar from '../components/Sidebar'
+import { useChat } from '../contexts/ChatContext'
 
 interface ChatPageProps {
   settings: SettingsType
@@ -13,12 +14,10 @@ interface ChatPageProps {
 }
 
 export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentProgress, setCurrentProgress] = useState<ProgressEvent | null>(null)
+  const { conversationId, setConversationId, messages, setMessages, isLoading, setIsLoading, currentProgress, setCurrentProgress, addMessage } = useChat()
   const [input, setInput] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [conversationId, setConversationId] = useState<string | null>(null)
+  const location = useLocation()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -38,6 +37,33 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     }
   }, [input])
 
+  // Refresh conversation when coming back to the page or after refresh
+  useEffect(() => {
+    const refreshConversation = async () => {
+      if (conversationId && location.pathname === '/') {
+        try {
+          const response = await fetch(`/api/conversations/${conversationId}/messages`)
+          if (response.ok) {
+            const data = await response.json()
+            const loadedMessages: Message[] = data.messages.map((m: ConversationMessage) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.created_at),
+            }))
+            setMessages(loadedMessages)
+            setIsLoading(false)
+            setCurrentProgress(null)
+          }
+        } catch (error) {
+          console.error('Failed to refresh conversation:', error)
+        }
+      }
+    }
+    
+    refreshConversation()
+  }, [location, conversationId])
+
   const sendMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -46,7 +72,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       timestamp: new Date(),
     }
     
-    setMessages(prev => [...prev, userMessage])
+    addMessage(userMessage)
     setIsLoading(true)
     setCurrentProgress(null)
     setInput('')
@@ -227,7 +253,12 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     setMessages([])
     setConversationId(null)
     setCurrentProgress(null)
+    setIsLoading(false)
     setSidebarOpen(false)
+    localStorage.removeItem('chat_messages')
+    localStorage.removeItem('chat_conversation_id')
+    localStorage.removeItem('chat_is_loading')
+    localStorage.removeItem('chat_progress')
   }
 
   const handleSelectConversation = async (id: string) => {
