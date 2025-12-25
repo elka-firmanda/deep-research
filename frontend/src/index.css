@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-900 text-gray-100;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Markdown content styles */
+.markdown-content {
+  @apply text-gray-200 leading-relaxed;
+}
+
+.markdown-content > *:first-child {
+  @apply mt-0;
+}
+
+.markdown-content > *:last-child {
+  @apply mb-0;
+}
+
+/* Table responsiveness */
+.markdown-content table {
+  @apply text-sm;
+}
+
+/* Code syntax highlighting placeholder */
+.markdown-content pre code {
+  @apply text-gray-300;
+}
+
+/* Strong and emphasis */
+.markdown-content strong {
+  @apply font-semibold text-gray-100;
+}
+
+.markdown-content em {
+  @apply italic text-gray-300;
+}
+
+/* Citation superscripts - Wikipedia style */
+.markdown-content sup {
+  @apply text-xs leading-none align-super;
+}
+
+.markdown-content sup a {
+  @apply text-blue-400 hover:text-blue-300 no-underline font-normal;
+  font-size: 0.75rem;
+}
+
+.markdown-content sup a:hover {
+  text-decoration: underline;
+}
+
+/* References section styling */
+.markdown-content h2:has(+ ol),
+.markdown-content h2:has(+ ul) {
+  @apply mt-8;
+}
