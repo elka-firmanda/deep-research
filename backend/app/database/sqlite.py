@@ -15,8 +15,14 @@ class SQLiteChatStorage(ChatStorage):
 
     async def initialize(self) -> None:
         """Create connection and initialize tables."""
-        self.db = await aiosqlite.connect(self.database_path)
+        self.db = await aiosqlite.connect(
+            self.database_path, isolation_level=None, check_same_thread=False
+        )
         self.db.row_factory = aiosqlite.Row
+
+        # Set SQLite journal mode to WAL for better concurrency
+        await self.db.execute("PRAGMA journal_mode=WAL")
+        await self.db.execute("PRAGMA synchronous=NORMAL")
 
         # Create tables
         await self.db.execute("""

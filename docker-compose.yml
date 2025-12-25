@@ -21,7 +21,7 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./config/settings.json:/app/settings.json
-      - ./data:/app/data
+      - sqlite_data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -59,3 +59,4 @@ services:
 
 volumes:
   postgres_data:
+  sqlite_data:
