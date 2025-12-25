@@ -40,6 +40,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         console.error('Failed to parse saved messages:', e)
       }
     }
+    // Restore loading state - if we were loading, keep it loading
     if (savedLoading) setIsLoading(savedLoading === 'true')
     if (savedProgress) {
       try {

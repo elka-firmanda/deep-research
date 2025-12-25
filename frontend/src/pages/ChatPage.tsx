@@ -18,6 +18,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   const { conversationId, setConversationId, messages, setMessages, isLoading, setIsLoading, currentProgress, setCurrentProgress, addMessage } = useChat()
   const [input, setInput] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
   const location = useLocation()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -38,41 +39,67 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     }
   }, [input])
 
+  // Mark as initialized after mount
+  useEffect(() => {
+    setIsInitialized(true)
+  }, [])
+
   // Refresh conversation when coming back to the page or after refresh
   useEffect(() => {
+    if (!isInitialized || !conversationId || location.pathname !== '/') return
+
+    let pollInterval: NodeJS.Timeout | null = null
+    let initialTimeout: NodeJS.Timeout | null = null
+
     const refreshConversation = async () => {
-      if (conversationId && location.pathname === '/') {
-        try {
-          const response = await fetch(`/api/conversations/${conversationId}/messages`)
-          if (response.ok) {
-            const data = await response.json()
-            const loadedMessages: Message[] = data.messages.map((m: ConversationMessage) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.created_at),
-            }))
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}/messages`)
+        if (response.ok) {
+          const data = await response.json()
+          const loadedMessages: Message[] = data.messages.map((m: ConversationMessage) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.created_at),
+          }))
+          
+          setMessages(loadedMessages)
+          
+          // If we have an assistant response, request is complete
+          // User message + assistant response = 2 messages minimum
+          const hasAssistantResponse = loadedMessages.some(m => m.role === 'assistant')
+          
+          if (hasAssistantResponse) {
+            setIsLoading(false)
+            setCurrentProgress(null)
             
-            // Only update messages if they're different (avoid losing typing state)
-            setMessages(loadedMessages)
-            
-            // Only clear loading if we have the expected number of messages (response completed)
-            // User message + assistant response = 2 messages minimum for completed exchange
-            if (loadedMessages.length >= 2 || !isLoading) {
-              setIsLoading(false)
-              setCurrentProgress(null)
+            // Stop polling if we got response
+            if (pollInterval) {
+              clearInterval(pollInterval)
+              pollInterval = null
             }
           }
-        } catch (error) {
-          console.error('Failed to refresh conversation:', error)
         }
+      } catch (error) {
+        console.error('Failed to refresh conversation:', error)
       }
     }
-    
-    // Delay slightly to avoid race conditions
-    const timeoutId = setTimeout(refreshConversation, 100)
-    return () => clearTimeout(timeoutId)
-  }, [location.pathname, conversationId])
+
+    // Delay initial refresh to ensure ChatContext is fully initialized
+    initialTimeout = setTimeout(() => {
+      refreshConversation()
+      
+      // If we're in loading state, poll for updates
+      if (isLoading) {
+        pollInterval = setInterval(refreshConversation, 2000) // Poll every 2 seconds
+      }
+    }, 100)
+
+    return () => {
+      if (initialTimeout) clearTimeout(initialTimeout)
+      if (pollInterval) clearInterval(pollInterval)
+    }
+  }, [isInitialized, location.pathname, conversationId, isLoading])
 
   const sendMessage = async (content: string) => {
     const userMessage: Message = {
@@ -279,10 +306,13 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     setCurrentProgress(null)
     setIsLoading(false)
     setSidebarOpen(false)
+    // Clear all chat-related localStorage items
     localStorage.removeItem('chat_messages')
     localStorage.removeItem('chat_conversation_id')
     localStorage.removeItem('chat_is_loading')
     localStorage.removeItem('chat_progress')
+    // Clear all active streams
+    streamManager.clearAll()
   }
 
   const handleSelectConversation = async (id: string) => {

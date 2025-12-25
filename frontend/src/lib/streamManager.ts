@@ -64,6 +64,18 @@ class StreamManager {
     return this.activeStreams.size > 0
   }
 
+  clearAll() {
+    this.activeStreams.forEach((stream, streamId) => {
+      try {
+        stream.abortController.abort()
+        stream.reader.cancel()
+      } catch (e) {
+        console.error('Error clearing stream:', e)
+      }
+    })
+    this.activeStreams.clear()
+  }
+
   generateId(): string {
     return `stream_${++this.messageId}_${Date.now()}`
   }
