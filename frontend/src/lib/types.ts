@@ -12,6 +12,7 @@ export interface Settings {
   sessionId: string
   systemPrompt: string
   deepResearch: boolean
+  timezone: string
 }
 
 export interface ProviderInfo {
@@ -50,4 +51,26 @@ export interface ProgressEvent {
   progress: number
   tool?: string
   arguments?: Record<string, unknown> | undefined
+}
+
+export interface Conversation {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  metadata?: Record<string, unknown>
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[]
+  total: number
+}
+
+export interface ConversationMessage {
+  id: string
+  conversation_id: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+  metadata?: Record<string, unknown>
 }

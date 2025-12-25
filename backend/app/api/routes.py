@@ -1,16 +1,84 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import json
 import httpx
+import uuid
 from pathlib import Path
+from datetime import datetime
 
 from ..agents import SearchAgent
 from ..core.llm_providers import LLMProvider
 from ..core.config import settings
+from ..database import ChatStorage, SQLiteChatStorage, PostgresChatStorage, MessageRole
 
 router = APIRouter()
+
+# Database storage instance (initialized on startup)
+_chat_storage: Optional[ChatStorage] = None
+
+
+async def get_chat_storage() -> ChatStorage:
+    """Get or initialize the chat storage."""
+    global _chat_storage
+    if _chat_storage is None:
+        if settings.db_type == "postgres" and settings.postgres_password:
+            _chat_storage = PostgresChatStorage(
+                host=settings.postgres_host,
+                port=settings.postgres_port,
+                database=settings.postgres_db,
+                user=settings.postgres_user,
+                password=settings.postgres_password,
+            )
+        else:
+            # Default to SQLite
+            _chat_storage = SQLiteChatStorage(database_path=settings.db_path)
+
+        await _chat_storage.initialize()
+    return _chat_storage
+
+
+async def generate_conversation_title(
+    user_message: str,
+    assistant_response: str,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+) -> str:
+    """Generate a short, descriptive title for a conversation using the LLM."""
+    try:
+        # Use a simple LLM call to generate a title
+        llm_provider = None
+        if provider:
+            llm_provider = LLMProvider(provider)
+
+        # Create a minimal agent just for title generation
+        agent = SearchAgent(
+            provider=llm_provider,
+            model=model,
+            system_prompt="You are a helpful assistant that generates very short, concise titles.",
+        )
+
+        prompt = f"""Generate a short title (3-6 words) for this conversation. 
+Return ONLY the title, no quotes, no punctuation at the end.
+
+User's first message: {user_message[:200]}
+Assistant's response summary: {assistant_response[:200]}
+
+Title:"""
+
+        title = await agent.chat(prompt, stream=False)
+        # Clean up the title
+        title = title.strip().strip("\"'").strip()
+        # Limit length
+        if len(title) > 50:
+            title = title[:47] + "..."
+        return title if title else user_message[:30] + "..."
+    except Exception as e:
+        print(f"Error generating title: {e}")
+        # Fallback to simple truncation
+        return user_message[:30] + "..." if len(user_message) > 30 else user_message
+
 
 # Store agent sessions (in production, use Redis or similar)
 sessions: dict[str, SearchAgent] = {}
@@ -46,16 +114,19 @@ def write_settings(data: dict) -> bool:
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default"
+    conversation_id: Optional[str] = None  # UUID for conversation persistence
     provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None
     model: Optional[str] = None
     stream: bool = False
     system_prompt: Optional[str] = None
     deep_research: bool = False
+    timezone: Optional[str] = "UTC"  # User's timezone for date/time queries
 
 
 class ChatResponse(BaseModel):
     response: str
     session_id: str
+    conversation_id: str  # Return the conversation ID for the frontend to track
 
 
 class SearchRequest(BaseModel):
@@ -142,6 +213,31 @@ async def get_status():
 async def chat(request: ChatRequest):
     """Send a message to the agent with optional streaming progress."""
     try:
+        # Get or create conversation ID
+        conversation_id = request.conversation_id or str(uuid.uuid4())
+
+        # Initialize chat storage and ensure conversation exists
+        storage = await get_chat_storage()
+
+        # Check if conversation exists, create if not
+        existing_conv = await storage.get_conversation(conversation_id)
+        if not existing_conv:
+            await storage.create_conversation(
+                conversation_id=conversation_id,
+                metadata={
+                    "provider": request.provider,
+                    "model": request.model,
+                    "deep_research": request.deep_research,
+                },
+            )
+
+        # Save user message to database
+        await storage.add_message(
+            conversation_id=conversation_id,
+            role=MessageRole.USER,
+            content=request.message,
+        )
+
         # Always create a new agent with the specified provider/model for consistency
         llm_provider = None
         if request.provider:
@@ -175,6 +271,7 @@ async def chat(request: ChatRequest):
             provider=llm_provider,
             model=request.model,
             system_prompt=system_prompt,
+            timezone=request.timezone,
         )
 
         # Store/update session
@@ -184,8 +281,38 @@ async def chat(request: ChatRequest):
         if request.stream:
 
             async def generate():
+                final_response = ""
                 async for event in agent.chat_stream(request.message):
+                    # Capture the final response for saving
+                    if event.get("type") == "response":
+                        final_response = event.get("content", "")
                     yield f"data: {json.dumps(event)}\n\n"
+
+                # Save assistant response to database after streaming completes
+                if final_response:
+                    try:
+                        await storage.add_message(
+                            conversation_id=conversation_id,
+                            role=MessageRole.ASSISTANT,
+                            content=final_response,
+                        )
+                        # Generate title if this is the first exchange (2 messages: user + assistant)
+                        messages = await storage.get_messages(conversation_id, limit=3)
+                        if len(messages) == 2:
+                            title = await generate_conversation_title(
+                                request.message,
+                                final_response,
+                                request.provider,
+                                request.model,
+                            )
+                            await storage.update_conversation(
+                                conversation_id, title=title
+                            )
+                    except Exception as e:
+                        print(f"Error saving assistant message: {e}")
+
+                # Send conversation_id in the done event
+                yield f"data: {json.dumps({'type': 'conversation_id', 'conversation_id': conversation_id})}\n\n"
 
             return StreamingResponse(
                 generate(),
@@ -194,9 +321,28 @@ async def chat(request: ChatRequest):
 
         response = await agent.chat(request.message, stream=False)
 
+        # Save assistant response to database
+        await storage.add_message(
+            conversation_id=conversation_id,
+            role=MessageRole.ASSISTANT,
+            content=response,
+        )
+
+        # Generate title if this is the first exchange
+        messages = await storage.get_messages(conversation_id, limit=3)
+        if len(messages) == 2:
+            title = await generate_conversation_title(
+                request.message,
+                response,
+                request.provider,
+                request.model,
+            )
+            await storage.update_conversation(conversation_id, title=title)
+
         return ChatResponse(
             response=response,
             session_id=request.session_id,
+            conversation_id=conversation_id,
         )
 
     except Exception as e:
@@ -263,6 +409,7 @@ class SettingsRequest(BaseModel):
     model: Optional[str] = None
     system_prompt: Optional[str] = None
     deep_research: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 class SettingsResponse(BaseModel):
@@ -270,6 +417,7 @@ class SettingsResponse(BaseModel):
     model: Optional[str] = None
     system_prompt: Optional[str] = None
     deep_research: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 @router.get("/settings/{session_id}", response_model=SettingsResponse)
@@ -284,6 +432,7 @@ async def get_settings(session_id: str):
         model=saved.get("model", ""),
         system_prompt=saved.get("system_prompt", None),
         deep_research=saved.get("deep_research", False),
+        timezone=saved.get("timezone", "UTC"),
     )
     print(f"DEBUG: returning settings: {response}")
     return response
@@ -298,6 +447,7 @@ async def save_settings(session_id: str, request: SettingsRequest):
         "model": request.model,
         "system_prompt": request.system_prompt,
         "deep_research": request.deep_research,
+        "timezone": request.timezone,
     }
     if write_settings(data):
         return {"status": "saved", "session_id": session_id}
@@ -559,3 +709,182 @@ async def fetch_openrouter_models() -> ModelsResponse:
         models.sort(key=lambda x: x.name.lower())
 
         return ModelsResponse(provider="openrouter", models=models)
+
+
+# ============== Chat History Endpoints ==============
+
+
+class ConversationResponse(BaseModel):
+    id: str
+    title: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    metadata: Optional[dict] = None
+
+
+class MessageResponse(BaseModel):
+    id: str
+    conversation_id: str
+    role: str
+    content: str
+    created_at: datetime
+    metadata: Optional[dict] = None
+
+
+class ConversationListResponse(BaseModel):
+    conversations: List[ConversationResponse]
+    total: int
+
+
+class MessagesListResponse(BaseModel):
+    messages: List[MessageResponse]
+    conversation_id: str
+
+
+class AddMessageRequest(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    metadata: Optional[dict] = None
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+async def list_conversations(limit: int = 50, offset: int = 0):
+    """List all conversations, ordered by most recent."""
+    try:
+        storage = await get_chat_storage()
+        conversations = await storage.list_conversations(limit=limit, offset=offset)
+
+        return ConversationListResponse(
+            conversations=[
+                ConversationResponse(
+                    id=c.id,
+                    title=c.title,
+                    created_at=c.created_at,
+                    updated_at=c.updated_at,
+                    metadata=c.metadata,
+                )
+                for c in conversations
+            ],
+            total=len(conversations),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
+async def get_conversation(conversation_id: str):
+    """Get a specific conversation."""
+    try:
+        storage = await get_chat_storage()
+        conversation = await storage.get_conversation(conversation_id)
+
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        return ConversationResponse(
+            id=conversation.id,
+            title=conversation.title,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at,
+            metadata=conversation.metadata,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation and all its messages."""
+    try:
+        storage = await get_chat_storage()
+        deleted = await storage.delete_conversation(conversation_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        # Also clean up in-memory session
+        if conversation_id in sessions:
+            del sessions[conversation_id]
+
+        return {"status": "deleted", "conversation_id": conversation_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages", response_model=MessagesListResponse
+)
+async def get_conversation_messages(conversation_id: str, limit: Optional[int] = None):
+    """Get all messages in a conversation."""
+    try:
+        storage = await get_chat_storage()
+        messages = await storage.get_messages(conversation_id, limit=limit)
+
+        return MessagesListResponse(
+            messages=[
+                MessageResponse(
+                    id=m.id or "",
+                    conversation_id=m.conversation_id,
+                    role=m.role.value,
+                    content=m.content,
+                    created_at=m.created_at,
+                    metadata=m.metadata,
+                )
+                for m in messages
+            ],
+            conversation_id=conversation_id,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages", response_model=MessageResponse
+)
+async def add_message(conversation_id: str, request: AddMessageRequest):
+    """Add a message to a conversation."""
+    try:
+        storage = await get_chat_storage()
+        role = MessageRole.USER if request.role == "user" else MessageRole.ASSISTANT
+
+        message = await storage.add_message(
+            conversation_id=conversation_id,
+            role=role,
+            content=request.content,
+            metadata=request.metadata,
+        )
+
+        return MessageResponse(
+            id=message.id or "",
+            conversation_id=message.conversation_id,
+            role=message.role.value,
+            content=message.content,
+            created_at=message.created_at,
+            metadata=message.metadata,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/conversations/{conversation_id}/messages")
+async def clear_conversation_messages(conversation_id: str):
+    """Delete all messages in a conversation."""
+    try:
+        storage = await get_chat_storage()
+        count = await storage.delete_messages(conversation_id)
+
+        # Also reset in-memory session
+        if conversation_id in sessions:
+            sessions[conversation_id].reset()
+
+        return {
+            "status": "cleared",
+            "conversation_id": conversation_id,
+            "deleted_count": count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

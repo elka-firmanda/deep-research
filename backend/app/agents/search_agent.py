@@ -2,7 +2,13 @@ import json
 import asyncio
 from typing import Optional, AsyncGenerator, Callable
 from ..core.llm_providers import get_llm_client, LLMProvider
-from ..tools import TavilySearchTool, DeepSearchTool, WebScraperTool, BaseTool
+from ..tools import (
+    TavilySearchTool,
+    DeepSearchTool,
+    WebScraperTool,
+    DateTimeTool,
+    BaseTool,
+)
 
 
 class SearchAgent:
@@ -19,9 +25,10 @@ class SearchAgent:
     DEFAULT_SYSTEM_PROMPT = """You are an expert research assistant that produces comprehensive, well-sourced research reports. Your responses should read like Wikipedia articles or academic research summaries.
 
 ## Available Tools
-1. **tavily_search**: Quick web search for current information, news, and facts.
-2. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.
-3. **web_scraper**: Read the full content of a specific webpage URL.
+1. **get_current_datetime**: Get current date/time. ALWAYS use this first when the user's query involves time-sensitive information, relative dates (yesterday, last week, this month), or when you need to construct date-specific search queries.
+2. **tavily_search**: Quick web search for current information, news, and facts.
+3. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.
+4. **web_scraper**: Read the full content of a specific webpage URL.
 
 ## Response Guidelines
 
@@ -62,12 +69,14 @@ class SearchAgent:
         tavily_api_key: Optional[str] = None,
         progress_callback: Optional[Callable[[dict], None]] = None,
         system_prompt: Optional[str] = None,
+        timezone: Optional[str] = None,
     ):
         self.provider = provider
         self.model = model
         self.tavily_api_key = tavily_api_key
         self.progress_callback = progress_callback
         self.system_prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
+        self.timezone = timezone or "UTC"
 
         # Initialize tools
         self.tools: dict[str, BaseTool] = {}
@@ -84,6 +93,10 @@ class SearchAgent:
     def _init_tools(self):
         """Initialize available tools."""
         try:
+            # DateTime tool (always available)
+            self.tools["get_current_datetime"] = DateTimeTool()
+
+            # Search tools
             self.tools["tavily_search"] = TavilySearchTool(api_key=self.tavily_api_key)
             self.tools["deep_search"] = DeepSearchTool(
                 tavily_api_key=self.tavily_api_key,
@@ -168,9 +181,14 @@ class SearchAgent:
             # Get LLM client
             llm = get_llm_client(provider=self.provider, model=self.model)
 
+            # Prepare system prompt with timezone info
+            system_prompt_with_tz = self.system_prompt
+            if self.timezone:
+                system_prompt_with_tz += f'\n\n## User Context\n- User\'s timezone: {self.timezone}\n- When using get_current_datetime, always pass timezone="{self.timezone}" to get correct local time.'
+
             # Prepare messages with system prompt
             full_messages = [
-                {"role": "system", "content": self.system_prompt},
+                {"role": "system", "content": system_prompt_with_tz},
                 *self.messages,
             ]
 
@@ -261,10 +279,20 @@ class SearchAgent:
                         )
 
                     # Execute tools and add results
-                    for tc in tool_calls:
+                    total_tools = len(tool_calls)
+                    for idx, tc in enumerate(tool_calls):
                         args = tc["arguments"]
                         if isinstance(args, str):
                             args = json.loads(args)
+
+                        # Emit tool execution progress
+                        yield {
+                            "type": "progress",
+                            "step": "tool_execution",
+                            "status": "in_progress",
+                            "detail": f"Executing {tc['name']} ({idx + 1}/{total_tools})",
+                            "progress": int((idx / total_tools) * 50),
+                        }
 
                         # Yield progress events during tool execution
                         result = await self._execute_tool(tc["name"], args)
@@ -272,6 +300,15 @@ class SearchAgent:
                         # Yield any events that occurred during tool execution
                         while events:
                             yield events.pop(0)
+
+                        # Emit tool completion
+                        yield {
+                            "type": "progress",
+                            "step": "tool_execution",
+                            "status": "in_progress",
+                            "detail": f"Completed {tc['name']}",
+                            "progress": int(((idx + 1) / total_tools) * 50),
+                        }
 
                         if self.provider == LLMProvider.ANTHROPIC:
                             full_messages.append(
@@ -294,11 +331,38 @@ class SearchAgent:
                                     "content": result,
                                 }
                             )
+
+                    # After all tools complete, show that we're analyzing results
+                    yield {
+                        "type": "progress",
+                        "step": "analyzing",
+                        "status": "in_progress",
+                        "detail": "Analyzing search results...",
+                        "progress": 60,
+                    }
                 else:
-                    # Final response
+                    # Final response - show writing progress
+                    yield {
+                        "type": "progress",
+                        "step": "writing",
+                        "status": "in_progress",
+                        "detail": "Writing response...",
+                        "progress": 80,
+                    }
+
                     final_response = (
                         response if isinstance(response, str) else str(response)
                     )
+
+                    # Show formatting progress
+                    yield {
+                        "type": "progress",
+                        "step": "formatting",
+                        "status": "in_progress",
+                        "detail": "Formatting with citations...",
+                        "progress": 95,
+                    }
+
                     self.messages.append(
                         {"role": "assistant", "content": final_response}
                     )

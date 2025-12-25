@@ -4,7 +4,8 @@ import { Send, Settings, Loader2, Search, Globe, FileText, CheckCircle2, Circle,
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
-import { Settings as SettingsType, Message, ProgressEvent, ApiStatus } from '../lib/types'
+import { Settings as SettingsType, Message, ProgressEvent, ApiStatus, ConversationMessage } from '../lib/types'
+import Sidebar from '../components/Sidebar'
 
 interface ChatPageProps {
   settings: SettingsType
@@ -16,6 +17,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [currentProgress, setCurrentProgress] = useState<ProgressEvent | null>(null)
   const [input, setInput] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -57,11 +60,13 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         body: JSON.stringify({
           message: content,
           session_id: settings.sessionId,
+          conversation_id: conversationId || undefined,
           provider: settings.provider,
           model: settings.model || undefined,
           stream: true,
           system_prompt: settings.systemPrompt || undefined,
           deep_research: settings.deepResearch,
+          timezone: settings.timezone,
         }),
       })
 
@@ -81,7 +86,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       let buffer = ''
       let messageAdded = false
 
-      const processEvent = (event: { type: string; content?: string; step?: string; status?: string; detail?: string; progress?: number; tool?: string; arguments?: unknown }) => {
+      const processEvent = (event: { type: string; content?: string; step?: string; status?: string; detail?: string; progress?: number; tool?: string; arguments?: unknown; conversation_id?: string }) => {
         switch (event.type) {
           case 'progress':
             setCurrentProgress({
@@ -114,6 +119,13 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           
           case 'response':
             finalResponse = event.content || ''
+            break
+          
+          case 'conversation_id':
+            // Capture the conversation ID from the server
+            if (event.conversation_id) {
+              setConversationId(event.conversation_id)
+            }
             break
           
           case 'done':
@@ -205,8 +217,47 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         method: 'POST',
       })
       setMessages([])
+      setConversationId(null)
     } catch (error) {
       console.error('Failed to reset session:', error)
+    }
+  }
+
+  const handleNewChat = () => {
+    setMessages([])
+    setConversationId(null)
+    setCurrentProgress(null)
+    setSidebarOpen(false)
+  }
+
+  const handleSelectConversation = async (id: string) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${id}/messages`)
+      if (response.ok) {
+        const data = await response.json()
+        const loadedMessages: Message[] = data.messages.map((m: ConversationMessage) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.created_at),
+        }))
+        setMessages(loadedMessages)
+        setConversationId(id)
+        setSidebarOpen(false)
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteConversation = (id: string) => {
+    // If the deleted conversation is the current one, clear the chat
+    if (id === conversationId) {
+      setMessages([])
+      setConversationId(null)
     }
   }
 
@@ -225,40 +276,54 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white">
-      {/* Header */}
-      <header className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-700 bg-gray-800">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+    <div className="flex h-screen bg-gray-900 text-white">
+      {/* Sidebar */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        currentConversationId={conversationId}
+        onNewChat={handleNewChat}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+      />
+
+      {/* Main Content */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'lg:ml-72' : ''}`}>
+        {/* Header */}
+        <header className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-700 bg-gray-800">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Spacer for sidebar toggle button when closed */}
+            {!sidebarOpen && <div className="w-10" />}
+            <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <div>
+              <h1 className="text-base sm:text-lg font-semibold">AI Research Agent</h1>
+              <p className="text-xs text-gray-400 hidden sm:block">
+                {settings.provider} / {settings.model || 'default'}
+                {settings.deepResearch && ' • Deep Research'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-semibold">AI Research Agent</h1>
-            <p className="text-xs text-gray-400 hidden sm:block">
-              {settings.provider} / {settings.model || 'default'}
-              {settings.deepResearch && ' • Deep Research'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
-            <button
-              onClick={clearChat}
-              className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-              title="Clear chat"
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={clearChat}
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+                title="Clear chat"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          )}
-          <Link
-            to="/admin"
-            className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-            <span className="hidden sm:inline text-sm">Settings</span>
-          </Link>
-        </div>
-      </header>
+              <Settings className="w-5 h-5" />
+              <span className="hidden sm:inline text-sm">Settings</span>
+            </Link>
+          </div>
+        </header>
 
       {/* Status bar (mobile) */}
       <div className="sm:hidden px-3 py-2 bg-gray-800/50 border-b border-gray-700 text-xs text-gray-400 flex items-center gap-2 overflow-x-auto">
@@ -369,6 +434,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           </p>
         </form>
       </div>
+      </div>
     </div>
   )
 }
@@ -385,9 +451,16 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
       case 'synthesize':
         return <FileText className="w-4 h-4" />
       case 'tool_call':
+      case 'tool_execution':
         if (progress.tool === 'deep_search') return <Search className="w-4 h-4" />
         if (progress.tool === 'web_scraper') return <Globe className="w-4 h-4" />
         return <Search className="w-4 h-4" />
+      case 'analyzing':
+        return <FileText className="w-4 h-4" />
+      case 'writing':
+        return <FileText className="w-4 h-4" />
+      case 'formatting':
+        return <FileText className="w-4 h-4" />
       default:
         return <Loader2 className="w-4 h-4 animate-spin" />
     }
@@ -409,7 +482,16 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
         if (progress.tool === 'deep_search') return 'Deep Research'
         if (progress.tool === 'tavily_search') return 'Web Search'
         if (progress.tool === 'web_scraper') return 'Reading Page'
+        if (progress.tool === 'get_current_datetime') return 'Getting Date/Time'
         return progress.tool || 'Processing'
+      case 'tool_execution':
+        return 'Executing Tools'
+      case 'analyzing':
+        return 'Analyzing Results'
+      case 'writing':
+        return 'Writing Response'
+      case 'formatting':
+        return 'Formatting'
       case 'thinking':
         return 'Thinking'
       default:
@@ -417,14 +499,26 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
     }
   }
 
+  // Steps for the progress indicator (shown for deep_search or general progress)
   const steps = [
+    { id: 'tool_execution', label: 'Tools' },
+    { id: 'analyzing', label: 'Analyze' },
+    { id: 'writing', label: 'Write' },
+    { id: 'formatting', label: 'Format' },
+  ]
+  
+  // Alternative steps for deep_search tool
+  const deepSearchSteps = [
     { id: 'generate_queries', label: 'Questions' },
     { id: 'search', label: 'Search' },
     { id: 'scrape_pages', label: 'Read' },
     { id: 'synthesize', label: 'Synthesize' },
   ]
-
-  const currentStepIndex = steps.findIndex(s => s.id === progress.step)
+  
+  // Use deep search steps if using deep_search tool
+  const activeSteps = progress.tool === 'deep_search' || ['generate_queries', 'search', 'scrape_pages', 'synthesize'].includes(progress.step)
+    ? deepSearchSteps 
+    : steps
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
@@ -455,12 +549,13 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
         </div>
       )}
 
-      {/* Step indicators */}
-      {(progress.tool === 'deep_search' || ['generate_queries', 'search', 'scrape_pages', 'synthesize'].includes(progress.step)) && (
+      {/* Step indicators - show for deep_search or when we have progress steps */}
+      {(progress.progress > 0 || progress.tool === 'deep_search' || ['generate_queries', 'search', 'scrape_pages', 'synthesize', 'tool_execution', 'analyzing', 'writing', 'formatting'].includes(progress.step)) && (
         <div className="flex items-center justify-between text-xs overflow-x-auto">
-          {steps.map((step, index) => {
-            const isCompleted = index < currentStepIndex || (index === currentStepIndex && progress.status === 'completed')
-            const isCurrent = index === currentStepIndex && progress.status === 'in_progress'
+          {activeSteps.map((step, index) => {
+            const currentStepIdx = activeSteps.findIndex(s => s.id === progress.step)
+            const isCompleted = index < currentStepIdx || (index === currentStepIdx && progress.status === 'completed')
+            const isCurrent = index === currentStepIdx && progress.status === 'in_progress'
 
             return (
               <div key={step.id} className="flex items-center flex-shrink-0">
@@ -476,9 +571,9 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
                   )}
                   <span className="hidden sm:inline">{step.label}</span>
                 </div>
-                {index < steps.length - 1 && (
+                {index < activeSteps.length - 1 && (
                   <ArrowRight className={'w-3 h-3 sm:w-4 sm:h-4 mx-1 sm:mx-2 ' +
-                    (index < currentStepIndex ? 'text-green-400' : 'text-gray-600')
+                    (index < currentStepIdx ? 'text-green-400' : 'text-gray-600')
                   } />
                 )}
               </div>

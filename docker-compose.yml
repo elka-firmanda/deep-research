@@ -11,15 +11,24 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - SETTINGS_FILE=/app/settings.json
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - DB_PATH=/app/data/chat_history.db
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_agent}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-}
     volumes:
       - ./backend/app:/app/app
       - ./config/settings.json:/app/settings.json
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
 
   frontend:
     build:
@@ -31,3 +40,22 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  # Optional PostgreSQL service - uncomment to use PostgreSQL instead of SQLite
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-agent-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-ai_agent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    profiles:
+      - postgres
+
+volumes:
+  postgres_data:

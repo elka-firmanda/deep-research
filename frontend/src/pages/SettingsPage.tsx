@@ -1,8 +1,33 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, X, RefreshCw, FileText, RotateCcw, ChevronDown, ChevronUp, Search, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Check, X, RefreshCw, FileText, RotateCcw, ChevronDown, ChevronUp, Search, MessageSquare, Globe } from 'lucide-react'
 import { Settings, ApiStatus, ModelInfo } from '../lib/types'
 import SearchableSelect, { SelectOption } from '../components/SearchableSelect'
+
+// Common timezones for the dropdown
+const COMMON_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Sao_Paulo',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Moscow',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Bangkok',
+  'Asia/Singapore',
+  'Asia/Hong_Kong',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Australia/Sydney',
+  'Australia/Melbourne',
+  'Pacific/Auckland',
+]
 
 const DEFAULT_SYSTEM_PROMPT = `You are an expert research assistant that produces comprehensive, well-sourced research reports. Your responses should read like Wikipedia articles or academic research summaries.
 
@@ -43,7 +68,7 @@ const DEFAULT_SYSTEM_PROMPT = `You are an expert research assistant that produce
 - Include dates and specific details when available
 - Every paragraph should have at least one citation`
 
-interface AdminPageProps {
+interface SettingsPageProps {
   settings: Settings
   onSettingsChange: (settings: Settings) => void
   apiStatus: ApiStatus | null
@@ -52,14 +77,14 @@ interface AdminPageProps {
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
 }
 
-export default function AdminPage({
+export default function SettingsPage({
   settings,
   onSettingsChange,
   apiStatus,
   onSaveSettings,
   isSaving,
   saveStatus,
-}: AdminPageProps) {
+}: SettingsPageProps) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [modelsError, setModelsError] = useState<string | null>(null)
@@ -284,6 +309,31 @@ export default function AdminPage({
             </button>
           </section>
 
+          {/* Timezone Section */}
+          <section className="bg-gray-800 rounded-xl p-4 sm:p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Globe className="w-5 h-5" />
+              Timezone
+            </h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Set your timezone for accurate date/time in search queries (e.g., "news from yesterday")
+            </p>
+            <select
+              value={settings.timezone}
+              onChange={(e) => onSettingsChange({ ...settings, timezone: e.target.value })}
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz.replace(/_/g, ' ')} ({getTimezoneOffset(tz)})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              Current time in selected timezone: {getCurrentTimeInTimezone(settings.timezone)}
+            </p>
+          </section>
+
           {/* System Prompt Section */}
           <section className="bg-gray-800 rounded-xl p-4 sm:p-6">
             <button
@@ -384,4 +434,34 @@ function StatusCard({ label, status, detail }: { label: string; status: boolean;
       </p>
     </div>
   )
+}
+
+function getTimezoneOffset(timezone: string): string {
+  try {
+    const now = new Date()
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    })
+    const parts = formatter.formatToParts(now)
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')
+    return offsetPart?.value || ''
+  } catch {
+    return ''
+  }
+}
+
+function getCurrentTimeInTimezone(timezone: string): string {
+  try {
+    return new Date().toLocaleString('en-US', {
+      timeZone: timezone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return 'Invalid timezone'
+  }
 }

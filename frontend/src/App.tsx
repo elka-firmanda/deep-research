@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import ChatPage from './pages/ChatPage'
-import AdminPage from './pages/AdminPage'
+import SettingsPage from './pages/SettingsPage'
 import { Settings, ApiStatus } from './lib/types'
 
 const DEFAULT_SYSTEM_PROMPT = `You are an expert research assistant that produces comprehensive, well-sourced research reports. Your responses should read like Wikipedia articles or academic research summaries.
@@ -51,6 +51,7 @@ function App() {
     sessionId: 'default',
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     deepResearch: false,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
   })
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -78,6 +79,7 @@ function App() {
           model: settingsData?.model ?? '',
           systemPrompt: settingsData?.system_prompt ?? DEFAULT_SYSTEM_PROMPT,
           deepResearch: settingsData?.deep_research ?? false,
+          timezone: settingsData?.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'),
         }
 
         console.log('Final settings after initialization:', newSettings)
@@ -105,6 +107,7 @@ function App() {
           model: settings.model,
           system_prompt: settings.systemPrompt,
           deep_research: settings.deepResearch,
+          timezone: settings.timezone,
         }),
       })
       
@@ -146,9 +149,9 @@ function App() {
           } 
         />
         <Route 
-          path="/admin" 
+          path="/settings" 
           element={
-            <AdminPage 
+            <SettingsPage 
               settings={settings}
               onSettingsChange={setSettings}
               apiStatus={apiStatus}

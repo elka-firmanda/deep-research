@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Literal
 from functools import lru_cache
 
 
@@ -21,6 +21,17 @@ class Settings(BaseSettings):
 
     # OpenRouter settings
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    # Database settings
+    db_type: Literal["sqlite", "postgres"] = "sqlite"
+    db_path: str = "/app/data/chat_history.db"  # For SQLite
+
+    # PostgreSQL settings
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "ai_agent"
+    postgres_user: str = "postgres"
+    postgres_password: Optional[str] = None
 
     class Config:
         env_file = ".env"
