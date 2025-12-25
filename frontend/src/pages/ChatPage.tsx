@@ -72,18 +72,27 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           
           setMessages(loadedMessages)
           
-          // If we have an assistant response, request is complete
-          // User message + assistant response = 2 messages minimum
-          const hasAssistantResponse = loadedMessages.some(m => m.role === 'assistant')
+          // Check if conversation is complete (even number of messages)
+          // If odd, last user message doesn't have a response yet
+          const isComplete = loadedMessages.length % 2 === 0
+          const isIncomplete = loadedMessages.length % 2 !== 0 && loadedMessages.length > 0
           
-          if (hasAssistantResponse) {
+          if (isComplete && loadedMessages.length > 0) {
             setIsLoading(false)
             setCurrentProgress(null)
             
-            // Stop polling if we got response
+            // Stop polling if conversation is complete
             if (pollInterval) {
               clearInterval(pollInterval)
               pollInterval = null
+            }
+          } else if (isIncomplete) {
+            // If incomplete, ensure we're in loading state and polling
+            setIsLoading(true)
+            
+            // Ensure polling is active
+            if (!pollInterval) {
+              pollInterval = setInterval(refreshConversation, 2000)
             }
           }
         }
@@ -95,11 +104,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     // Delay initial refresh to ensure ChatContext is fully initialized
     initialTimeout = setTimeout(() => {
       refreshConversation()
-      
-      // If we're in loading state AND not actively sending, poll for updates
-      if (isLoading && !isSending) {
-        pollInterval = setInterval(refreshConversation, 2000) // Poll every 2 seconds
-      }
+      // Polling will be started/stopped inside refreshConversation based on conversation state
     }, 100)
 
     return () => {
