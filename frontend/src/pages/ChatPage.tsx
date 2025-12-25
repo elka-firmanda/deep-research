@@ -19,6 +19,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   const [input, setInput] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const location = useLocation()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -52,6 +53,12 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     let initialTimeout: NodeJS.Timeout | null = null
 
     const refreshConversation = async () => {
+      // Don't refresh if we're actively sending a new message
+      // This prevents overwriting the new message with stale data from DB
+      if (isSending) {
+        return
+      }
+
       try {
         const response = await fetch(`/api/conversations/${conversationId}/messages`)
         if (response.ok) {
@@ -89,8 +96,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     initialTimeout = setTimeout(() => {
       refreshConversation()
       
-      // If we're in loading state, poll for updates
-      if (isLoading) {
+      // If we're in loading state AND not actively sending, poll for updates
+      if (isLoading && !isSending) {
         pollInterval = setInterval(refreshConversation, 2000) // Poll every 2 seconds
       }
     }, 100)
@@ -99,9 +106,10 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       if (initialTimeout) clearTimeout(initialTimeout)
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [isInitialized, location.pathname, conversationId, isLoading])
+  }, [isInitialized, location.pathname, conversationId, isLoading, isSending])
 
   const sendMessage = async (content: string) => {
+    setIsSending(true)
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -285,6 +293,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         streamManager.removeStream(streamId)
       }
       setIsLoading(false)
+      setIsSending(false)
     }
   }
 
