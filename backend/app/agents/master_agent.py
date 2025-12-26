@@ -122,24 +122,38 @@ class MasterAgent(BaseAgent):
         self.messages.append({"role": "user", "content": message})
 
         try:
+            # Truncate query for display
+            query_preview = message[:50] + "..." if len(message) > 50 else message
+
             # Step 1: Analyze query
             yield {
                 "type": "progress",
                 "step": "analyzing",
                 "status": "in_progress",
-                "detail": "Analyzing your request...",
+                "detail": f"Understanding: \"{query_preview}\"",
                 "progress": 5,
                 "source": "master_agent",
             }
 
             analysis = await self.analyzer.analyze(message, self.messages)
 
+            # Build descriptive routing message
+            subagents_desc = []
+            if "planner" in analysis.required_subagents:
+                subagents_desc.append("creating research plan")
+            if "search_scraper" in analysis.required_subagents:
+                subagents_desc.append("searching the web")
+            if "tool_executor" in analysis.required_subagents:
+                subagents_desc.append("checking current date/time")
+
+            routing_detail = " → ".join(subagents_desc) if subagents_desc else "processing"
+
             # Step 2: Route to subagents
             yield {
                 "type": "progress",
                 "step": "routing",
                 "status": "in_progress",
-                "detail": f"Planning {analysis.query_type} response...",
+                "detail": f"Strategy: {routing_detail}",
                 "progress": 10,
                 "source": "master_agent",
             }
@@ -155,11 +169,12 @@ class MasterAgent(BaseAgent):
                 results = await self._route_direct(analysis, message)
 
             # Step 3: Synthesize results
+            successful_count = len([r for r in results if r.success])
             yield {
                 "type": "progress",
                 "step": "synthesizing",
                 "status": "in_progress",
-                "detail": "Analyzing and synthesizing results...",
+                "detail": f"Writing comprehensive response from {successful_count} sources...",
                 "progress": 90,
                 "source": "master_agent",
             }

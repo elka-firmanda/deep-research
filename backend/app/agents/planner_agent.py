@@ -64,10 +64,11 @@ class PlannerAgent(BaseAgent):
         Returns:
             ToolResult containing the research plan
         """
+        query_preview = query[:40] + "..." if len(query) > 40 else query
         self._emit_progress(
             step="planner_analyzing",
             status="in_progress",
-            detail="Analyzing query complexity...",
+            detail=f"Analyzing: \"{query_preview}\"",
             progress=10,
             source="planner_agent",
         )
@@ -115,7 +116,7 @@ Generate the plan now:"""
             self._emit_progress(
                 step="planner_generating",
                 status="in_progress",
-                detail="Generating research plan...",
+                detail=f"Creating {num_steps}-step research strategy...",
                 progress=40,
                 source="planner_agent",
             )
@@ -134,10 +135,12 @@ Generate the plan now:"""
             if not self._validate_plan(plan):
                 raise ValueError("Generated plan has invalid structure")
 
+            steps_count = len(plan.get('steps', []))
+            goal = plan.get('goal', '')[:50]
             self._emit_progress(
                 step="planner_complete",
                 status="completed",
-                detail=f"Research plan ready: {len(plan.get('steps', []))} steps",
+                detail=f"Plan ready: {steps_count} steps to {goal}...",
                 progress=100,
                 source="planner_agent",
             )

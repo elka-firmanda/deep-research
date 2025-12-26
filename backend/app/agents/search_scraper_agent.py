@@ -91,10 +91,13 @@ class SearchScraperAgent(BaseAgent):
         Returns:
             ToolResult containing aggregated results
         """
+        query_preview = query[:40] + "..." if len(query) > 40 else query
+        plan_goal = plan.get("goal", "research")[:50] if plan.get("goal") else "research"
+
         self._emit_progress(
             step="search_scraper_start",
             status="in_progress",
-            detail="Starting plan-guided research...",
+            detail=f"Executing research plan: {plan_goal}",
             progress=5,
             source="search_scraper_agent",
         )
@@ -175,10 +178,12 @@ class SearchScraperAgent(BaseAgent):
         Returns:
             ToolResult from DeepSearchTool
         """
+        query_preview = query[:50] + "..." if len(query) > 50 else query
+
         self._emit_progress(
             step="search_scraper_start",
             status="in_progress",
-            detail="Starting autonomous research...",
+            detail=f"Researching: \"{query_preview}\"",
             progress=5,
             source="search_scraper_agent",
         )

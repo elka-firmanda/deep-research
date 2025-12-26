@@ -63,10 +63,17 @@ class ToolExecutorAgent(BaseAgent):
         Returns:
             ToolResult with success/failure and data
         """
+        # Create descriptive message based on tool
+        tool_descriptions = {
+            "get_current_datetime": f"Checking current date and time ({self.timezone})",
+            "calculator": "Performing calculation",
+        }
+        detail = tool_descriptions.get(tool_name, f"Running {tool_name}")
+
         self._emit_progress(
             step="tool_executor_start",
             status="in_progress",
-            detail=f"Executing {tool_name}...",
+            detail=detail,
             progress=10,
             source="tool_executor_agent",
         )

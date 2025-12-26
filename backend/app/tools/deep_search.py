@@ -56,10 +56,11 @@ class DeepSearchTool(BaseTool):
         self, query: str, num_queries: int = 3
     ) -> list[str]:
         """Generate sub-queries to explore different aspects of the main query."""
+        query_preview = query[:40] + "..." if len(query) > 40 else query
         self._emit_progress(
             step="generate_queries",
             status="in_progress",
-            detail="Analyzing query and generating research questions...",
+            detail=f"Breaking down \"{query_preview}\" into {num_queries} research angles...",
             progress=5,
         )
 
@@ -115,10 +116,12 @@ Respond with a JSON array of strings, nothing else. Example:
         self, search_results: list[dict], max_pages: int = 5
     ) -> list[dict]:
         """Scrape the top search results for full content."""
+        # Count total sources found
+        total_sources = sum(len(r.get("results", [])) for r in search_results)
         self._emit_progress(
             step="scrape_pages",
             status="in_progress",
-            detail=f"Reading full content from top {max_pages} pages...",
+            detail=f"Found {total_sources} sources, reading top {max_pages} in detail...",
             progress=50,
         )
 
@@ -168,10 +171,11 @@ Respond with a JSON array of strings, nothing else. Example:
         scraped_pages: list[dict],
     ) -> str:
         """Synthesize multiple search results into a comprehensive answer."""
+        total_sources = sum(len(r.get("results", [])) for r in search_results)
         self._emit_progress(
             step="synthesize",
             status="in_progress",
-            detail="Analyzing and synthesizing all information...",
+            detail=f"Writing Wikipedia-style article from {total_sources} sources and {len(scraped_pages)} pages...",
             progress=75,
         )
 
@@ -281,10 +285,12 @@ Write your comprehensive response:"""
             all_queries = [query] + [q for q in sub_queries if q != query]
 
             # Step 2: Execute all searches in parallel
+            # Show first few queries being searched
+            query_samples = [q[:30] + "..." if len(q) > 30 else q for q in all_queries[:2]]
             self._emit_progress(
                 step="search",
                 status="in_progress",
-                detail=f"Searching {len(all_queries)} queries...",
+                detail=f"Searching: \"{query_samples[0]}\" + {len(all_queries)-1} more...",
                 progress=15,
             )
 
@@ -310,10 +316,12 @@ Write your comprehensive response:"""
                     result_data["query"] = all_queries[i]
                     successful_results.append(result_data)
 
+            # Count total results
+            total_results = sum(len(r.get("results", [])) for r in successful_results)
             self._emit_progress(
                 step="search",
                 status="completed",
-                detail=f"Found results from {len(successful_results)} searches",
+                detail=f"Found {total_results} results from {len(successful_results)} searches",
                 progress=40,
             )
 
