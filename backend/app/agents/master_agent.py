@@ -362,7 +362,24 @@ class MasterAgent(BaseAgent):
         if len(successful) == 1 and not failed:
             return self._format_single_result(query, successful[0])
 
-        # Multiple results: use LLM to synthesize
+        # Check if search_scraper has a synthesis - use it directly with optional context
+        search_result = next((r for r in successful if r.subagent == "search_scraper_agent"), None)
+        if search_result and isinstance(search_result.data, dict) and search_result.data.get("synthesis"):
+            synthesis = search_result.data["synthesis"]
+
+            # Add datetime context if available
+            datetime_result = next((r for r in successful if r.subagent == "tool_executor_agent"), None)
+            if datetime_result and datetime_result.data:
+                # Prepend datetime context if relevant
+                synthesis = f"*Current date/time context: {datetime_result.data}*\n\n{synthesis}"
+
+            # Add note about failures if any
+            if failed:
+                synthesis += "\n\n*Note: Some research components encountered issues but I've provided the best answer possible with available information.*"
+
+            return synthesis
+
+        # Multiple results without existing synthesis: use LLM to synthesize
         return await self._llm_synthesize(query, successful, failed)
 
     def _format_single_result(self, query: str, result: SubagentResult) -> str:
@@ -422,13 +439,19 @@ class MasterAgent(BaseAgent):
             elif result.subagent == "search_scraper_agent":
                 data = result.data
                 if isinstance(data, dict):
-                    sources = data.get("all_sources", [])
-                    context_parts.append(f"Search Results: {len(sources)} sources found")
-                    # Add source summaries
-                    for i, source in enumerate(sources[:10], 1):
-                        title = source.get("title", "")
-                        url = source.get("url", "")
-                        context_parts.append(f"{i}. {title}\n   {url}")
+                    # If there's already a synthesis from DeepSearchTool, use it directly
+                    if "synthesis" in data and data["synthesis"]:
+                        context_parts.append(f"Research Findings:\n{data['synthesis']}")
+                    else:
+                        # Fall back to source summaries if no synthesis
+                        sources = data.get("all_sources", data.get("sources", []))
+                        context_parts.append(f"Search Results: {len(sources)} sources found")
+                        # Add source summaries
+                        for i, source in enumerate(sources[:10], 1):
+                            title = source.get("title", "")
+                            url = source.get("url", "")
+                            content = source.get("content", "")[:200] if source.get("content") else ""
+                            context_parts.append(f"{i}. {title}\n   {url}\n   {content}")
 
         context_str = "\n\n".join(context_parts)
 
