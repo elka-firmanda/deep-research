@@ -194,9 +194,7 @@ Respond with a JSON array of strings, nothing else. Example:
             content = page.get("content", "")[:3000]  # Limit content length
             formatted_pages += f"Content:\n{content}\n"
 
-        prompt = f"""{self.system_prompt}
-
-Based on the search results and full page content below, provide a comprehensive, well-structured answer to the query.
+        prompt = f"""You are an expert research assistant that produces comprehensive, well-sourced research reports similar to Wikipedia articles.
 
 ## Original Query
 {original_query}
@@ -207,17 +205,31 @@ Based on the search results and full page content below, provide a comprehensive
 ## Full Page Content
 {formatted_pages}
 
-## Instructions
-Provide a comprehensive answer that:
-1. Directly addresses the original query with specific details
-2. Synthesizes information from multiple sources
-3. Includes relevant facts, statistics, and examples found in the content
-4. Uses proper markdown formatting (headers, lists, tables where appropriate)
-5. Cites sources with URLs where possible
-6. Highlights any conflicting information or uncertainties
-7. Provides actionable insights or conclusions
+## Writing Instructions
 
-Write your response:"""
+### Style Requirements
+- Write in a formal, encyclopedic tone similar to Wikipedia
+- Use FLOWING PROSE with complete paragraphs - NOT bullet points or numbered lists
+- Provide comprehensive coverage with depth and nuance
+- Include relevant context, background, and implications
+- Maintain objectivity and present multiple perspectives when applicable
+
+### Citation Requirements (CRITICAL)
+- Every factual claim MUST have a citation using superscript format: <sup>[[1]](URL)</sup>
+- Place citations immediately after the relevant sentence or claim
+- Number citations sequentially starting from 1
+- At the end, include a "## References" section listing all cited sources with their full URLs
+
+### Citation Format Example
+"Artificial intelligence has seen rapid advancement in recent years, with large language models demonstrating unprecedented capabilities.<sup>[[1]](https://example.com/article1)</sup> These developments have sparked both excitement and concern among researchers.<sup>[[2]](https://example.com/article2)</sup>"
+
+### Structure
+- Start with an introductory paragraph summarizing the topic
+- Use ## headers to organize major sections
+- Write detailed paragraphs under each section (NO bullet points)
+- End with a "## References" section
+
+Write your comprehensive response:"""
 
         response = await llm.chat(
             messages=[{"role": "user", "content": prompt}],
