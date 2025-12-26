@@ -31,7 +31,7 @@ A powerful AI-powered research assistant with a modern web UI that can search th
 
 ### Modern UI
 - Real-time streaming responses with Server-Sent Events (SSE)
-- Progress indicators showing research steps
+- Dynamic progress indicators showing what the agent is doing (e.g., "Searching Google for weather in Tokyo...")
 - Searchable model dropdown with 100+ models
 - Dark theme interface
 - Persistent conversation history with SQLite/PostgreSQL support

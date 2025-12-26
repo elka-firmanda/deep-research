@@ -202,8 +202,20 @@ Respond ONLY with a JSON object in this exact format:
                 max_tokens=150,
             )
 
+            # Handle empty response
+            if not response or not response.strip():
+                raise ValueError("Empty response from LLM")
+
+            # Try to extract JSON from response (LLM might include extra text)
+            response_text = response.strip()
+
+            # Try to find JSON object in the response
+            json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group()
+
             # Parse JSON response
-            classification = json.loads(response)
+            classification = json.loads(response_text)
 
             # Map to QueryAnalysis
             query_type = classification.get("query_type", "general")

@@ -55,10 +55,11 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     const MAX_POLL_COUNT = 15 // Stop polling after 30 seconds (15 polls * 2 seconds)
 
     const refreshConversation = async () => {
-      // Don't refresh if we're actively sending a new message
+      // Don't refresh if we're actively sending a new message or loading a response
       // This prevents overwriting the new message with stale data from DB
-      if (isSending) {
-        pollCount = 0 // Reset poll count when actively sending
+      // and prevents resetting progress state during streaming
+      if (isSending || isLoading) {
+        pollCount = 0 // Reset poll count when actively sending/loading
         return
       }
 
@@ -130,7 +131,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       if (initialTimeout) clearTimeout(initialTimeout)
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [isInitialized, location.pathname, conversationId, isSending])
+  }, [isInitialized, location.pathname, conversationId, isSending, isLoading])
 
   const sendMessage = async (content: string) => {
     setIsSending(true)
@@ -219,7 +220,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             setCurrentProgress({
               step: 'tool_call',
               status: 'in_progress',
-              detail: 'Using ' + event.tool + '...',
+              detail: event.detail || ('Using ' + event.tool + '...'),
               progress: 0,
               tool: event.tool,
               arguments: (event.arguments as Record<string, unknown> | undefined) || {},
@@ -573,93 +574,10 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
 }
 
 function ProgressCard({ progress }: { progress: ProgressEvent }) {
-  const getStepIcon = (step: string) => {
-    switch (step) {
-      case 'generate_queries':
-        return <FileText className="w-4 h-4" />
-      case 'search':
-        return <Search className="w-4 h-4" />
-      case 'scrape_pages':
-        return <Globe className="w-4 h-4" />
-      case 'synthesize':
-        return <FileText className="w-4 h-4" />
-      case 'tool_call':
-      case 'tool_execution':
-        if (progress.tool === 'deep_search') return <Search className="w-4 h-4" />
-        if (progress.tool === 'web_scraper') return <Globe className="w-4 h-4" />
-        return <Search className="w-4 h-4" />
-      case 'analyzing':
-        return <FileText className="w-4 h-4" />
-      case 'writing':
-        return <FileText className="w-4 h-4" />
-      case 'formatting':
-        return <FileText className="w-4 h-4" />
-      default:
-        return <Loader2 className="w-4 h-4 animate-spin" />
-    }
-  }
-
-  const getStepName = (step: string) => {
-    switch (step) {
-      case 'start':
-        return 'Starting Research'
-      case 'generate_queries':
-        return 'Generating Questions'
-      case 'search':
-        return 'Searching Web'
-      case 'scrape_pages':
-        return 'Reading Pages'
-      case 'synthesize':
-        return 'Synthesizing'
-      case 'tool_call':
-        if (progress.tool === 'deep_search') return 'Deep Research'
-        if (progress.tool === 'tavily_search') return 'Web Search'
-        if (progress.tool === 'web_scraper') return 'Reading Page'
-        if (progress.tool === 'get_current_datetime') return 'Getting Date/Time'
-        return progress.tool || 'Processing'
-      case 'tool_execution':
-        return 'Executing Tools'
-      case 'analyzing':
-        return 'Analyzing Results'
-      case 'writing':
-        return 'Writing Response'
-      case 'formatting':
-        return 'Formatting'
-      case 'thinking':
-        return 'Thinking'
-      default:
-        return step
-    }
-  }
-
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
-        <div className="p-2 bg-blue-600/20 rounded-lg flex-shrink-0">
-          {getStepIcon(progress.step)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-200 text-sm sm:text-base">{getStepName(progress.step)}</div>
-          <div className="text-xs sm:text-sm text-gray-400 truncate">{progress.detail}</div>
-        </div>
-        {progress.status === 'in_progress' && (
-          <Loader2 className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0" />
-        )}
-      </div>
-
-      {/* Progress Bar */}
-      {progress.progress > 0 && (
-        <div>
-          <div className="h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 transition-all duration-500 ease-out"
-              style={{ width: progress.progress + '%' }}
-            />
-          </div>
-          <div className="text-xs text-gray-500 mt-1 text-right">{progress.progress}%</div>
-        </div>
-      )}
+    <div className="flex items-center gap-3 px-2 py-2">
+      <Loader2 className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0" />
+      <span className="text-sm text-gray-300">{progress.detail}</span>
     </div>
   )
 }

@@ -27,9 +27,9 @@ class SearchAgent:
 
 ## Available Tools
 1. **get_current_datetime**: Get current date/time. ALWAYS use this first when the user's query involves time-sensitive information, relative dates (yesterday, last week, this month), or when you need to construct date-specific search queries.
-2. **tavily_search**: Quick web search for current information, news, and facts using Tavily.
-3. **serpapi_search**: Google search results via SerpAPI. Provides organic Google results with answer boxes and knowledge graphs. Good for general queries and factual information.
-4. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.
+2. **tavily_search**: Quick web search for current information, news, and facts. This is your PRIMARY search tool for most queries.
+3. **serpapi_search**: Google search results via SerpAPI. Use as an alternative to tavily_search when you need Google-specific results, answer boxes, or knowledge graphs.
+4. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics requiring in-depth analysis.
 5. **web_scraper**: Read the full content of a specific webpage URL.
 
 ## CRITICAL Tool Usage Rules
@@ -102,6 +102,37 @@ class SearchAgent:
         """Emit a progress event."""
         if self.progress_callback:
             self.progress_callback({"type": event_type, **data})
+
+    def _generate_tool_progress_message(self, tool_name: str, arguments: dict) -> str:
+        """Generate a dynamic progress message based on the tool and its arguments."""
+        query = arguments.get("query", "")
+
+        # Truncate long queries for display
+        if len(query) > 50:
+            query_display = query[:47] + "..."
+        else:
+            query_display = query
+
+        if tool_name == "serpapi_search":
+            return f"Searching Google for \"{query_display}\"..."
+        elif tool_name == "tavily_search":
+            return f"Searching the web for \"{query_display}\"..."
+        elif tool_name == "deep_search":
+            return f"Performing deep research on \"{query_display}\"..."
+        elif tool_name == "web_scraper":
+            url = arguments.get("url", "")
+            if len(url) > 40:
+                url_display = url[:37] + "..."
+            else:
+                url_display = url
+            return f"Reading page: {url_display}..."
+        elif tool_name == "get_current_datetime":
+            timezone = arguments.get("timezone", "")
+            if timezone:
+                return f"Getting current time in {timezone}..."
+            return "Getting current date and time..."
+        else:
+            return f"Using {tool_name}..."
 
     def _init_tools(self):
         """Initialize available tools."""
@@ -228,12 +259,15 @@ class SearchAgent:
                 while events:
                     yield events.pop(0)
 
-                yield {
-                    "type": "thinking",
-                    "content": "Analyzing your request..."
-                    if iteration == 1
-                    else "Processing results...",
-                }
+                # Skip generic thinking messages - we'll show dynamic tool-specific messages instead
+                if iteration == 1:
+                    yield {
+                        "type": "progress",
+                        "step": "thinking",
+                        "status": "in_progress",
+                        "detail": "Understanding your request...",
+                        "progress": 0,
+                    }
 
                 response = await llm.chat(
                     messages=full_messages,
@@ -246,16 +280,20 @@ class SearchAgent:
                     tool_calls = response["tool_calls"]
                     assistant_content = response.get("content", "")
 
-                    # Emit tool call info
+                    # Emit tool call info with dynamic progress message
                     for tc in tool_calls:
                         args = tc["arguments"]
                         if isinstance(args, str):
                             args = json.loads(args)
 
+                        # Generate dynamic progress message based on tool and arguments
+                        detail = self._generate_tool_progress_message(tc["name"], args)
+
                         yield {
                             "type": "tool_call",
                             "tool": tc["name"],
                             "arguments": args,
+                            "detail": detail,
                         }
 
                     # Add assistant message with tool calls
@@ -359,8 +397,8 @@ class SearchAgent:
                         "type": "progress",
                         "step": "analyzing",
                         "status": "in_progress",
-                        "detail": "Analyzing search results...",
-                        "progress": 60,
+                        "detail": "Analyzing the results...",
+                        "progress": 0,
                     }
                 else:
                     # Final response - show writing progress
@@ -368,8 +406,8 @@ class SearchAgent:
                         "type": "progress",
                         "step": "writing",
                         "status": "in_progress",
-                        "detail": "Writing response...",
-                        "progress": 80,
+                        "detail": "Writing the response...",
+                        "progress": 0,
                     }
 
                     final_response = (
@@ -390,8 +428,8 @@ class SearchAgent:
                         "type": "progress",
                         "step": "formatting",
                         "status": "in_progress",
-                        "detail": "Formatting with citations...",
-                        "progress": 95,
+                        "detail": "Formatting the response...",
+                        "progress": 0,
                     }
 
                     self.messages.append(
