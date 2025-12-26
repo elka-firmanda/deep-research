@@ -367,11 +367,13 @@ class MasterAgent(BaseAgent):
         if search_result and isinstance(search_result.data, dict) and search_result.data.get("synthesis"):
             synthesis = search_result.data["synthesis"]
 
-            # Add datetime context if available
+            # Add datetime context if available (formatted nicely, not raw dict)
             datetime_result = next((r for r in successful if r.subagent == "tool_executor_agent"), None)
             if datetime_result and datetime_result.data:
-                # Prepend datetime context if relevant
-                synthesis = f"*Current date/time context: {datetime_result.data}*\n\n{synthesis}"
+                dt_data = datetime_result.data
+                if isinstance(dt_data, dict) and "formatted" in dt_data:
+                    # Use the pre-formatted datetime string
+                    synthesis = f"*Research conducted: {dt_data['formatted']}*\n\n{synthesis}"
 
             # Add note about failures if any
             if failed:

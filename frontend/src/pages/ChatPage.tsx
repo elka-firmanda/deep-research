@@ -786,13 +786,13 @@ function MessageBubble({ message }: { message: Message }) {
                   <CodeBlock>{children}</CodeBlock>
                 ),
                 ul: ({ children }) => (
-                  <ul className="list-disc list-inside space-y-1 my-2 pl-2">{children}</ul>
+                  <ul className="list-disc list-outside space-y-1 my-2 ml-5">{children}</ul>
                 ),
                 ol: ({ children }) => (
-                  <ol className="list-decimal list-inside space-y-1 my-2 pl-2">{children}</ol>
+                  <ol className="list-decimal list-outside space-y-1 my-2 ml-5">{children}</ol>
                 ),
                 li: ({ children }) => (
-                  <li className="text-gray-300">{children}</li>
+                  <li className="text-gray-300 pl-1">{children}</li>
                 ),
                 h1: ({ children }) => (
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-100 mt-6 mb-3">{children}</h1>
