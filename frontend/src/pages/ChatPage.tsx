@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Send, Settings, Loader2, Search, Globe, FileText, CheckCircle2, Circle, ArrowRight, Sparkles, Trash2 } from 'lucide-react'
+import { Send, Settings, Loader2, Search, Globe, FileText, Sparkles, Trash2, Copy, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -49,13 +49,16 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   useEffect(() => {
     if (!isInitialized || !conversationId || location.pathname !== '/') return
 
-    let pollInterval: NodeJS.Timeout | null = null
-    let initialTimeout: NodeJS.Timeout | null = null
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    let initialTimeout: ReturnType<typeof setTimeout> | null = null
+    let pollCount = 0
+    const MAX_POLL_COUNT = 15 // Stop polling after 30 seconds (15 polls * 2 seconds)
 
     const refreshConversation = async () => {
       // Don't refresh if we're actively sending a new message
       // This prevents overwriting the new message with stale data from DB
       if (isSending) {
+        pollCount = 0 // Reset poll count when actively sending
         return
       }
 
@@ -69,27 +72,43 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             content: m.content,
             timestamp: new Date(m.created_at),
           }))
-          
+
           setMessages(loadedMessages)
-          
+
           // Check if conversation is complete (even number of messages)
           // If odd, last user message doesn't have a response yet
           const isComplete = loadedMessages.length % 2 === 0
           const isIncomplete = loadedMessages.length % 2 !== 0 && loadedMessages.length > 0
-          
+
           if (isComplete && loadedMessages.length > 0) {
             setIsLoading(false)
             setCurrentProgress(null)
-            
+            pollCount = 0
+
             // Stop polling if conversation is complete
             if (pollInterval) {
               clearInterval(pollInterval)
               pollInterval = null
             }
           } else if (isIncomplete) {
+            pollCount++
+
+            // If we've polled too many times, the stream was likely interrupted
+            // Stop polling and clear loading state to allow user to continue
+            if (pollCount >= MAX_POLL_COUNT) {
+              console.warn('Polling timeout: stream may have been interrupted')
+              setIsLoading(false)
+              setCurrentProgress(null)
+              if (pollInterval) {
+                clearInterval(pollInterval)
+                pollInterval = null
+              }
+              return
+            }
+
             // If incomplete, ensure we're in loading state and polling
             setIsLoading(true)
-            
+
             // Ensure polling is active
             if (!pollInterval) {
               pollInterval = setInterval(refreshConversation, 2000)
@@ -111,7 +130,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       if (initialTimeout) clearTimeout(initialTimeout)
       if (pollInterval) clearInterval(pollInterval)
     }
-  }, [isInitialized, location.pathname, conversationId, isLoading, isSending])
+  }, [isInitialized, location.pathname, conversationId, isSending])
 
   const sendMessage = async (content: string) => {
     setIsSending(true)
@@ -150,6 +169,21 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           system_prompt: settings.systemPrompt || undefined,
           deep_research: settings.deepResearch,
           timezone: settings.timezone,
+          max_tokens: settings.maxTokens || undefined,
+          multi_agent_mode: settings.multiAgentMode || false,
+          // Per-agent models and providers (only sent if multi_agent_mode is enabled)
+          master_agent_model: settings.masterAgentModel || undefined,
+          master_agent_provider: settings.masterAgentProvider || undefined,
+          planner_agent_model: settings.plannerAgentModel || undefined,
+          planner_agent_provider: settings.plannerAgentProvider || undefined,
+          search_scraper_agent_model: settings.searchScraperAgentModel || undefined,
+          search_scraper_agent_provider: settings.searchScraperAgentProvider || undefined,
+          tool_executor_agent_model: settings.toolExecutorAgentModel || undefined,
+          tool_executor_agent_provider: settings.toolExecutorAgentProvider || undefined,
+          // Per-agent system prompts (only sent if multi_agent_mode is enabled)
+          master_agent_system_prompt: settings.masterAgentSystemPrompt || undefined,
+          planner_agent_system_prompt: settings.plannerAgentSystemPrompt || undefined,
+          search_scraper_agent_system_prompt: settings.searchScraperAgentSystemPrompt || undefined,
         }),
         signal: abortController.signal,
       })
@@ -511,7 +545,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything... research topics, compare options, explain concepts"
-                className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[48px] max-h-[200px]"
+                className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 pr-12 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[48px] max-h-[200px]"
                 rows={1}
                 disabled={isLoading}
               />
@@ -598,27 +632,6 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
     }
   }
 
-  // Steps for the progress indicator (shown for deep_search or general progress)
-  const steps = [
-    { id: 'tool_execution', label: 'Tools' },
-    { id: 'analyzing', label: 'Analyze' },
-    { id: 'writing', label: 'Write' },
-    { id: 'formatting', label: 'Format' },
-  ]
-  
-  // Alternative steps for deep_search tool
-  const deepSearchSteps = [
-    { id: 'generate_queries', label: 'Questions' },
-    { id: 'search', label: 'Search' },
-    { id: 'scrape_pages', label: 'Read' },
-    { id: 'synthesize', label: 'Synthesize' },
-  ]
-  
-  // Use deep search steps if using deep_search tool
-  const activeSteps = progress.tool === 'deep_search' || ['generate_queries', 'search', 'scrape_pages', 'synthesize'].includes(progress.step)
-    ? deepSearchSteps 
-    : steps
-
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
       {/* Header */}
@@ -637,9 +650,9 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
 
       {/* Progress Bar */}
       {progress.progress > 0 && (
-        <div className="mb-3">
+        <div>
           <div className="h-1.5 sm:h-2 bg-gray-700 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-blue-500 transition-all duration-500 ease-out"
               style={{ width: progress.progress + '%' }}
             />
@@ -647,46 +660,46 @@ function ProgressCard({ progress }: { progress: ProgressEvent }) {
           <div className="text-xs text-gray-500 mt-1 text-right">{progress.progress}%</div>
         </div>
       )}
+    </div>
+  )
+}
 
-      {/* Step indicators - show for deep_search or when we have progress steps */}
-      {(progress.progress > 0 || progress.tool === 'deep_search' || ['generate_queries', 'search', 'scrape_pages', 'synthesize', 'tool_execution', 'analyzing', 'writing', 'formatting'].includes(progress.step)) && (
-        <div className="flex items-center justify-between text-xs overflow-x-auto">
-          {activeSteps.map((step, index) => {
-            const currentStepIdx = activeSteps.findIndex(s => s.id === progress.step)
-            const isCompleted = index < currentStepIdx || (index === currentStepIdx && progress.status === 'completed')
-            const isCurrent = index === currentStepIdx && progress.status === 'in_progress'
+function CodeBlock({ children }: { children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const preRef = useRef<HTMLPreElement>(null)
 
-            return (
-              <div key={step.id} className="flex items-center flex-shrink-0">
-                <div className={'flex items-center gap-1 ' +
-                  (isCompleted ? 'text-green-400' : isCurrent ? 'text-blue-400' : 'text-gray-500')
-                }>
-                  {isCompleted ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  ) : isCurrent ? (
-                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                  ) : (
-                    <Circle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  )}
-                  <span className="hidden sm:inline">{step.label}</span>
-                </div>
-                {index < activeSteps.length - 1 && (
-                  <ArrowRight className={'w-3 h-3 sm:w-4 sm:h-4 mx-1 sm:mx-2 ' +
-                    (index < currentStepIdx ? 'text-green-400' : 'text-gray-600')
-                  } />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+  const handleCopy = () => {
+    if (preRef.current) {
+      const code = preRef.current.textContent || ''
+      navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div className="relative group">
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        title={copied ? 'Copied!' : 'Copy code'}
+      >
+        {copied ? (
+          <Check className="w-4 h-4 text-green-400" />
+        ) : (
+          <Copy className="w-4 h-4 text-gray-300" />
+        )}
+      </button>
+      <pre ref={preRef} className="bg-gray-900 rounded-lg overflow-x-auto my-3 sm:my-4 -mx-4 sm:mx-0">
+        {children}
+      </pre>
     </div>
   )
 }
 
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === 'user'
-  
+
   return (
     <div className={'flex ' + (isUser ? 'justify-end' : 'justify-start')}>
       <div
@@ -697,6 +710,7 @@ function MessageBubble({ message }: { message: Message }) {
             ? 'bg-red-900/50 border border-red-700 max-w-full'
             : 'bg-gray-800 border border-gray-700 max-w-full'
           )}
+        style={{ fontFamily: 'Inter, sans-serif' }}
       >
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
@@ -769,9 +783,7 @@ function MessageBubble({ message }: { message: Message }) {
                   )
                 },
                 pre: ({ children }) => (
-                  <pre className="bg-gray-900 rounded-lg overflow-x-auto my-3 sm:my-4 -mx-4 sm:mx-0">
-                    {children}
-                  </pre>
+                  <CodeBlock>{children}</CodeBlock>
                 ),
                 ul: ({ children }) => (
                   <ul className="list-disc list-inside space-y-1 my-2 pl-2">{children}</ul>

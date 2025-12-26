@@ -1,11 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode, Dispatch, SetStateAction } from 'react'
 import { Message, ProgressEvent } from '../lib/types'
 
 interface ChatContextType {
   conversationId: string | null
   setConversationId: (id: string | null) => void
   messages: Message[]
-  setMessages: (messages: Message[]) => void
+  setMessages: Dispatch<SetStateAction<Message[]>>
   isLoading: boolean
   setIsLoading: (loading: boolean) => void
   currentProgress: ProgressEvent | null
@@ -40,9 +40,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         console.error('Failed to parse saved messages:', e)
       }
     }
-    // Restore loading state - if we were loading, keep it loading
-    if (savedLoading) setIsLoading(savedLoading === 'true')
-    if (savedProgress) {
+    // Only restore loading state if we have a valid conversation
+    // Otherwise clear loading to prevent stuck state on refresh
+    if (savedConversationId && savedLoading === 'true') {
+      setIsLoading(true)
+    } else {
+      setIsLoading(false)
+    }
+    if (savedProgress && savedConversationId) {
       try {
         setCurrentProgress(JSON.parse(savedProgress))
       } catch (e) {

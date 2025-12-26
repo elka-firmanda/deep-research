@@ -121,6 +121,21 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
     deep_research: bool = False
     timezone: Optional[str] = "UTC"  # User's timezone for date/time queries
+    max_tokens: Optional[int] = None  # Max tokens for response generation
+    multi_agent_mode: bool = False  # Enable multi-agent orchestration (experimental)
+    # Per-agent model configuration (for multi-agent mode)
+    master_agent_model: Optional[str] = None  # Model for MasterAgent synthesis
+    master_agent_provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None  # Provider for MasterAgent
+    planner_agent_model: Optional[str] = None  # Model for PlannerAgent
+    planner_agent_provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None  # Provider for PlannerAgent
+    search_scraper_agent_model: Optional[str] = None  # Model for SearchScraperAgent
+    search_scraper_agent_provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None  # Provider for SearchScraperAgent
+    tool_executor_agent_model: Optional[str] = None  # Model for ToolExecutorAgent
+    tool_executor_agent_provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None  # Provider for ToolExecutorAgent
+    # Per-agent system prompts (for multi-agent mode)
+    master_agent_system_prompt: Optional[str] = None  # System prompt for MasterAgent
+    planner_agent_system_prompt: Optional[str] = None  # System prompt for PlannerAgent
+    search_scraper_agent_system_prompt: Optional[str] = None  # System prompt for SearchScraperAgent
 
 
 class ChatResponse(BaseModel):
@@ -151,6 +166,7 @@ class StatusResponse(BaseModel):
     status: str
     providers: list[ProviderInfo]
     tavily_available: bool
+    serpapi_available: bool
 
 
 def get_or_create_session(
@@ -206,6 +222,7 @@ async def get_status():
         status="ok",
         providers=providers,
         tavily_available=bool(settings.tavily_api_key),
+        serpapi_available=bool(settings.serpapi_api_key),
     )
 
 
@@ -256,23 +273,79 @@ async def chat(request: ChatRequest):
                 "## Important Rules\n- ALWAYS use **deep_search** for comprehensive research. Only use tavily_search for simple fact-checking.",
             )
         else:
-            # Quick search mode - modify prompt to use tavily_search only
-            system_prompt = system_prompt.replace(
-                "## Available Tools\n1. **tavily_search**: Quick web search for current information, news, and facts.\n2. **deep_search**",
-                "## Available Tools\n1. **tavily_search**: Quick web search for current information, news, and facts.",
-            )
-            system_prompt = system_prompt.replace("3. **web_scraper**", "")
-            system_prompt = system_prompt.replace(
-                "2. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.\n3. **web_scraper**: Read the full content of a specific webpage URL.",
-                "2. **web_scraper**: Read the full content of a specific webpage URL.",
-            )
+            # When deep research is disabled, remove search tool mentions from system prompt
+            system_prompt = """You are a knowledgeable assistant that provides informative and helpful responses based on your training data.
 
-        agent = SearchAgent(
-            provider=llm_provider,
-            model=request.model,
-            system_prompt=system_prompt,
-            timezone=request.timezone,
-        )
+## Response Guidelines
+
+### Writing Style
+- Write in a clear, conversational tone
+- Use complete paragraphs with flowing prose
+- Provide comprehensive coverage when possible
+- Include relevant context and background
+- Maintain objectivity and present balanced perspectives
+
+### Important Rules
+- Answer based on your knowledge and training data
+- If you're unsure about something, acknowledge your uncertainty
+- Provide thoughtful, well-reasoned responses
+- Include specific details when you know them
+- Be clear when information might be outdated or when you're making inferences
+
+Remember: You don't have access to real-time information or web search. Your knowledge is based on your training data."""
+
+        # Select agent based on mode
+        if request.multi_agent_mode:
+            # Use MasterAgent for multi-agent orchestration
+            from ..agents import MasterAgent
+
+            # Convert per-agent providers to LLMProvider enum if specified
+            planner_provider = None
+            if request.planner_agent_provider:
+                planner_provider = LLMProvider(request.planner_agent_provider)
+
+            search_scraper_provider = None
+            if request.search_scraper_agent_provider:
+                search_scraper_provider = LLMProvider(request.search_scraper_agent_provider)
+
+            tool_executor_provider = None
+            if request.tool_executor_agent_provider:
+                tool_executor_provider = LLMProvider(request.tool_executor_agent_provider)
+
+            # Master agent provider
+            master_provider = llm_provider
+            if request.master_agent_provider:
+                master_provider = LLMProvider(request.master_agent_provider)
+
+            # Use per-agent models and providers if specified, otherwise fall back to main
+            agent = MasterAgent(
+                provider=master_provider,
+                model=request.master_agent_model or request.model,
+                tavily_api_key=settings.tavily_api_key,
+                system_prompt=request.master_agent_system_prompt or system_prompt,
+                timezone=request.timezone,
+                max_tokens=request.max_tokens,
+                # Per-agent model and provider configuration
+                planner_model=request.planner_agent_model or request.model,
+                planner_provider=planner_provider or llm_provider,
+                planner_system_prompt=request.planner_agent_system_prompt,
+                search_scraper_model=request.search_scraper_agent_model or request.model,
+                search_scraper_provider=search_scraper_provider or llm_provider,
+                search_scraper_system_prompt=request.search_scraper_agent_system_prompt,
+                tool_executor_model=request.tool_executor_agent_model or request.model,
+                tool_executor_provider=tool_executor_provider or llm_provider,
+            )
+        else:
+            # Use traditional SearchAgent
+            agent = SearchAgent(
+                provider=llm_provider,
+                model=request.model,
+                tavily_api_key=settings.tavily_api_key,
+                serpapi_api_key=settings.serpapi_api_key,
+                system_prompt=system_prompt,
+                timezone=request.timezone,
+                enable_search=request.deep_research,  # Only enable search tools when deep research is on
+            )
 
         # Store/update session
         if request.session_id:
@@ -410,6 +483,21 @@ class SettingsRequest(BaseModel):
     system_prompt: Optional[str] = None
     deep_research: Optional[bool] = None
     timezone: Optional[str] = None
+    max_tokens: Optional[int] = None
+    multi_agent_mode: Optional[bool] = None
+    # Per-agent model configuration
+    master_agent_model: Optional[str] = None
+    master_agent_provider: Optional[str] = None
+    planner_agent_model: Optional[str] = None
+    planner_agent_provider: Optional[str] = None
+    search_scraper_agent_model: Optional[str] = None
+    search_scraper_agent_provider: Optional[str] = None
+    tool_executor_agent_model: Optional[str] = None
+    tool_executor_agent_provider: Optional[str] = None
+    # Per-agent system prompts
+    master_agent_system_prompt: Optional[str] = None
+    planner_agent_system_prompt: Optional[str] = None
+    search_scraper_agent_system_prompt: Optional[str] = None
 
 
 class SettingsResponse(BaseModel):
@@ -418,6 +506,21 @@ class SettingsResponse(BaseModel):
     system_prompt: Optional[str] = None
     deep_research: Optional[bool] = None
     timezone: Optional[str] = None
+    max_tokens: Optional[int] = None
+    multi_agent_mode: Optional[bool] = None
+    # Per-agent model configuration
+    master_agent_model: Optional[str] = None
+    master_agent_provider: Optional[str] = None
+    planner_agent_model: Optional[str] = None
+    planner_agent_provider: Optional[str] = None
+    search_scraper_agent_model: Optional[str] = None
+    search_scraper_agent_provider: Optional[str] = None
+    tool_executor_agent_model: Optional[str] = None
+    tool_executor_agent_provider: Optional[str] = None
+    # Per-agent system prompts
+    master_agent_system_prompt: Optional[str] = None
+    planner_agent_system_prompt: Optional[str] = None
+    search_scraper_agent_system_prompt: Optional[str] = None
 
 
 @router.get("/settings/{session_id}", response_model=SettingsResponse)
@@ -433,6 +536,21 @@ async def get_settings(session_id: str):
         system_prompt=saved.get("system_prompt", None),
         deep_research=saved.get("deep_research", False),
         timezone=saved.get("timezone", "UTC"),
+        max_tokens=saved.get("max_tokens"),
+        multi_agent_mode=saved.get("multi_agent_mode", False),
+        # Per-agent model configuration
+        master_agent_model=saved.get("master_agent_model"),
+        master_agent_provider=saved.get("master_agent_provider"),
+        planner_agent_model=saved.get("planner_agent_model"),
+        planner_agent_provider=saved.get("planner_agent_provider"),
+        search_scraper_agent_model=saved.get("search_scraper_agent_model"),
+        search_scraper_agent_provider=saved.get("search_scraper_agent_provider"),
+        tool_executor_agent_model=saved.get("tool_executor_agent_model"),
+        tool_executor_agent_provider=saved.get("tool_executor_agent_provider"),
+        # Per-agent system prompts
+        master_agent_system_prompt=saved.get("master_agent_system_prompt"),
+        planner_agent_system_prompt=saved.get("planner_agent_system_prompt"),
+        search_scraper_agent_system_prompt=saved.get("search_scraper_agent_system_prompt"),
     )
     print(f"DEBUG: returning settings: {response}")
     return response
@@ -448,6 +566,21 @@ async def save_settings(session_id: str, request: SettingsRequest):
         "system_prompt": request.system_prompt,
         "deep_research": request.deep_research,
         "timezone": request.timezone,
+        "max_tokens": request.max_tokens,
+        "multi_agent_mode": request.multi_agent_mode,
+        # Per-agent model configuration
+        "master_agent_model": request.master_agent_model,
+        "master_agent_provider": request.master_agent_provider,
+        "planner_agent_model": request.planner_agent_model,
+        "planner_agent_provider": request.planner_agent_provider,
+        "search_scraper_agent_model": request.search_scraper_agent_model,
+        "search_scraper_agent_provider": request.search_scraper_agent_provider,
+        "tool_executor_agent_model": request.tool_executor_agent_model,
+        "tool_executor_agent_provider": request.tool_executor_agent_provider,
+        # Per-agent system prompts
+        "master_agent_system_prompt": request.master_agent_system_prompt,
+        "planner_agent_system_prompt": request.planner_agent_system_prompt,
+        "search_scraper_agent_system_prompt": request.search_scraper_agent_system_prompt,
     }
     if write_settings(data):
         return {"status": "saved", "session_id": session_id}

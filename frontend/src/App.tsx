@@ -81,6 +81,21 @@ function App() {
           systemPrompt: settingsData?.system_prompt ?? DEFAULT_SYSTEM_PROMPT,
           deepResearch: settingsData?.deep_research ?? false,
           timezone: settingsData?.timezone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'),
+          maxTokens: settingsData?.max_tokens,
+          multiAgentMode: settingsData?.multi_agent_mode ?? false,
+          // Per-agent model configuration
+          masterAgentModel: settingsData?.master_agent_model,
+          masterAgentProvider: settingsData?.master_agent_provider,
+          plannerAgentModel: settingsData?.planner_agent_model,
+          plannerAgentProvider: settingsData?.planner_agent_provider,
+          searchScraperAgentModel: settingsData?.search_scraper_agent_model,
+          searchScraperAgentProvider: settingsData?.search_scraper_agent_provider,
+          toolExecutorAgentModel: settingsData?.tool_executor_agent_model,
+          toolExecutorAgentProvider: settingsData?.tool_executor_agent_provider,
+          // Per-agent system prompts
+          masterAgentSystemPrompt: settingsData?.master_agent_system_prompt,
+          plannerAgentSystemPrompt: settingsData?.planner_agent_system_prompt,
+          searchScraperAgentSystemPrompt: settingsData?.search_scraper_agent_system_prompt,
         }
 
         console.log('Final settings after initialization:', newSettings)
@@ -98,7 +113,7 @@ function App() {
   const saveSettings = async () => {
     setIsSaving(true)
     setSaveStatus('saving')
-    
+
     try {
       const response = await fetch('/api/settings/' + settings.sessionId, {
         method: 'POST',
@@ -109,9 +124,24 @@ function App() {
           system_prompt: settings.systemPrompt,
           deep_research: settings.deepResearch,
           timezone: settings.timezone,
+          max_tokens: settings.maxTokens,
+          multi_agent_mode: settings.multiAgentMode,
+          // Per-agent model configuration
+          master_agent_model: settings.masterAgentModel,
+          master_agent_provider: settings.masterAgentProvider,
+          planner_agent_model: settings.plannerAgentModel,
+          planner_agent_provider: settings.plannerAgentProvider,
+          search_scraper_agent_model: settings.searchScraperAgentModel,
+          search_scraper_agent_provider: settings.searchScraperAgentProvider,
+          tool_executor_agent_model: settings.toolExecutorAgentModel,
+          tool_executor_agent_provider: settings.toolExecutorAgentProvider,
+          // Per-agent system prompts
+          master_agent_system_prompt: settings.masterAgentSystemPrompt,
+          planner_agent_system_prompt: settings.plannerAgentSystemPrompt,
+          search_scraper_agent_system_prompt: settings.searchScraperAgentSystemPrompt,
         }),
       })
-      
+
       if (response.ok) {
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus('idle'), 2000)

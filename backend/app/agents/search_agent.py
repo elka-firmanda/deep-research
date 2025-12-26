@@ -4,6 +4,7 @@ from typing import Optional, AsyncGenerator, Callable
 from ..core.llm_providers import get_llm_client, LLMProvider
 from ..tools import (
     TavilySearchTool,
+    SerpApiSearchTool,
     DeepSearchTool,
     WebScraperTool,
     DateTimeTool,
@@ -26,9 +27,17 @@ class SearchAgent:
 
 ## Available Tools
 1. **get_current_datetime**: Get current date/time. ALWAYS use this first when the user's query involves time-sensitive information, relative dates (yesterday, last week, this month), or when you need to construct date-specific search queries.
-2. **tavily_search**: Quick web search for current information, news, and facts.
-3. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.
-4. **web_scraper**: Read the full content of a specific webpage URL.
+2. **tavily_search**: Quick web search for current information, news, and facts using Tavily.
+3. **serpapi_search**: Google search results via SerpAPI. Provides organic Google results with answer boxes and knowledge graphs. Good for general queries and factual information.
+4. **deep_search**: Comprehensive research that searches multiple queries, reads full page content, and synthesizes information. Use this for complex topics.
+5. **web_scraper**: Read the full content of a specific webpage URL.
+
+## CRITICAL Tool Usage Rules
+- Use tools by calling them through the function calling mechanism - NEVER mention them in your text response
+- Do NOT write things like "<deep_search>query</deep_search>" or "I'll use the deep_search tool" in your response
+- Call tools silently without describing what you're doing
+- Your text responses should ONLY contain the final research answer, never tool invocation descriptions
+- The user should never see tool names or execution details in your response text
 
 ## Response Guidelines
 
@@ -67,16 +76,20 @@ class SearchAgent:
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
         tavily_api_key: Optional[str] = None,
+        serpapi_api_key: Optional[str] = None,
         progress_callback: Optional[Callable[[dict], None]] = None,
         system_prompt: Optional[str] = None,
         timezone: Optional[str] = None,
+        enable_search: bool = True,
     ):
         self.provider = provider
         self.model = model
         self.tavily_api_key = tavily_api_key
+        self.serpapi_api_key = serpapi_api_key
         self.progress_callback = progress_callback
         self.system_prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
         self.timezone = timezone or "UTC"
+        self.enable_search = enable_search
 
         # Initialize tools
         self.tools: dict[str, BaseTool] = {}
@@ -96,15 +109,24 @@ class SearchAgent:
             # DateTime tool (always available)
             self.tools["get_current_datetime"] = DateTimeTool()
 
-            # Search tools
-            self.tools["tavily_search"] = TavilySearchTool(api_key=self.tavily_api_key)
-            self.tools["deep_search"] = DeepSearchTool(
-                tavily_api_key=self.tavily_api_key,
-                llm_provider=self.provider,
-                llm_model=self.model,
-                progress_callback=self.progress_callback,
-            )
-            self.tools["web_scraper"] = WebScraperTool()
+            # Search tools (only if enable_search is True)
+            if self.enable_search:
+                # Add Tavily if API key is available
+                if self.tavily_api_key:
+                    self.tools["tavily_search"] = TavilySearchTool(api_key=self.tavily_api_key)
+                    self.tools["deep_search"] = DeepSearchTool(
+                        tavily_api_key=self.tavily_api_key,
+                        llm_provider=self.provider,
+                        llm_model=self.model,
+                        progress_callback=self.progress_callback,
+                    )
+
+                # Add SerpAPI if API key is available
+                if self.serpapi_api_key:
+                    self.tools["serpapi_search"] = SerpApiSearchTool(api_key=self.serpapi_api_key)
+
+                # Web scraper (no API key needed)
+                self.tools["web_scraper"] = WebScraperTool()
         except ValueError as e:
             # Tools may fail to initialize if API keys are missing
             print(f"Warning: Some tools not initialized: {e}")
@@ -353,6 +375,15 @@ class SearchAgent:
                     final_response = (
                         response if isinstance(response, str) else str(response)
                     )
+
+                    # Clean up any tool invocation artifacts from the response
+                    import re
+                    # Remove XML-style tool tags like <deep_search>...</deep_search>
+                    final_response = re.sub(r'<(deep_search|tavily_search|web_scraper|get_current_datetime)[^>]*>.*?</\1>', '', final_response, flags=re.DOTALL)
+                    # Remove self-closing tags
+                    final_response = re.sub(r'<(deep_search|tavily_search|web_scraper|get_current_datetime)[^>]*/?>', '', final_response)
+                    # Clean up extra whitespace
+                    final_response = re.sub(r'\n\s*\n\s*\n', '\n\n', final_response).strip()
 
                     # Show formatting progress
                     yield {

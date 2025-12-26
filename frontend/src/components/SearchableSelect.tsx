@@ -86,8 +86,8 @@ export default function SearchableSelect({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         className={`
-          w-full flex items-center justify-between gap-2 px-3 py-2
-          bg-gray-700 border rounded-lg text-left
+          w-full h-[50px] flex items-center justify-between gap-2 px-4
+          bg-gray-700 border rounded-lg text-left text-base
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600 cursor-pointer'}
           ${error ? 'border-red-500' : 'border-gray-600'}
           ${isOpen ? 'ring-2 ring-blue-500 border-transparent' : ''}

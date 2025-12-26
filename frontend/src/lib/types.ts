@@ -13,6 +13,21 @@ export interface Settings {
   systemPrompt: string
   deepResearch: boolean
   timezone: string
+  maxTokens?: number  // Max tokens for response generation
+  multiAgentMode?: boolean  // Enable multi-agent orchestration (experimental)
+  // Per-agent model configuration (for multi-agent mode)
+  masterAgentModel?: string  // Model for MasterAgent synthesis
+  masterAgentProvider?: string  // Provider for MasterAgent
+  plannerAgentModel?: string  // Model for PlannerAgent
+  plannerAgentProvider?: string  // Provider for PlannerAgent
+  searchScraperAgentModel?: string  // Model for SearchScraperAgent
+  searchScraperAgentProvider?: string  // Provider for SearchScraperAgent
+  toolExecutorAgentModel?: string  // Model for ToolExecutorAgent (usually not needed)
+  toolExecutorAgentProvider?: string  // Provider for ToolExecutorAgent
+  // Per-agent system prompts (for multi-agent mode)
+  masterAgentSystemPrompt?: string  // System prompt for MasterAgent
+  plannerAgentSystemPrompt?: string  // System prompt for PlannerAgent
+  searchScraperAgentSystemPrompt?: string  // System prompt for SearchScraperAgent
 }
 
 export interface ProviderInfo {
@@ -25,6 +40,7 @@ export interface ApiStatus {
   status: string
   providers: ProviderInfo[]
   tavily_available: boolean
+  serpapi_available: boolean
 }
 
 export interface ModelInfo {
@@ -51,6 +67,7 @@ export interface ProgressEvent {
   progress: number
   tool?: string
   arguments?: Record<string, unknown> | undefined
+  source?: string  // Source subagent: 'planner_agent', 'search_scraper_agent', 'tool_executor_agent', 'master_agent'
 }
 
 export interface Conversation {

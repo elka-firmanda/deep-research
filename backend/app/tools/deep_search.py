@@ -28,12 +28,14 @@ class DeepSearchTool(BaseTool):
         llm_provider: Optional[LLMProvider] = None,
         llm_model: Optional[str] = None,
         progress_callback: Optional[Callable[[dict], None]] = None,
+        system_prompt: Optional[str] = None,
     ):
         self.tavily_tool = TavilySearchTool(api_key=tavily_api_key)
         self.web_scraper = WebScraperTool()
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.progress_callback = progress_callback
+        self.system_prompt = system_prompt or "You are an expert research analyst."
 
     def _emit_progress(
         self, step: str, status: str, detail: str = "", progress: int = 0
@@ -192,7 +194,9 @@ Respond with a JSON array of strings, nothing else. Example:
             content = page.get("content", "")[:3000]  # Limit content length
             formatted_pages += f"Content:\n{content}\n"
 
-        prompt = f"""You are an expert research analyst. Based on the search results and full page content below, provide a comprehensive, well-structured answer to the query.
+        prompt = f"""{self.system_prompt}
+
+Based on the search results and full page content below, provide a comprehensive, well-structured answer to the query.
 
 ## Original Query
 {original_query}

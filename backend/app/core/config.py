@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
     tavily_api_key: Optional[str] = None
+    serpapi_api_key: Optional[str] = None
 
     # Default LLM settings
     default_provider: str = "openai"  # openai, anthropic, openrouter

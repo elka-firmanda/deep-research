@@ -1,5 +1,3 @@
-import { Message, ProgressEvent } from '../lib/types'
-
 interface ActiveStream {
   abortController: AbortController
   conversationId: string | null
@@ -65,7 +63,7 @@ class StreamManager {
   }
 
   clearAll() {
-    this.activeStreams.forEach((stream, streamId) => {
+    this.activeStreams.forEach((stream) => {
       try {
         stream.abortController.abort()
         stream.reader.cancel()
