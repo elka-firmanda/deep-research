@@ -8,7 +8,7 @@ autonomous research.
 import asyncio
 from typing import Optional
 from ..core.llm_providers import LLMProvider
-from ..tools import TavilySearchTool, DeepSearchTool, WebScraperTool, ToolResult
+from ..tools import TavilySearchTool, DeepSearchTool, WebScraperTool, ApifyScraperTool, ToolResult
 from .base_agent import BaseAgent
 
 
@@ -24,6 +24,7 @@ class SearchScraperAgent(BaseAgent):
     def __init__(
         self,
         tavily_api_key: Optional[str] = None,
+        apify_api_key: Optional[str] = None,
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -34,6 +35,7 @@ class SearchScraperAgent(BaseAgent):
 
         Args:
             tavily_api_key: API key for Tavily search
+            apify_api_key: API key for Apify advanced scraping (optional)
             provider: LLM provider for DeepSearchTool
             model: Specific model for DeepSearchTool
             system_prompt: Optional custom system prompt for search synthesis
@@ -52,7 +54,16 @@ class SearchScraperAgent(BaseAgent):
             progress_callback=self._create_subagent_callback("deep_search"),
             system_prompt=self.system_prompt,
         )
+
+        # Initialize scrapers - use Apify if available, fallback to basic scraper
         self.web_scraper = WebScraperTool()
+        self.apify_scraper = None
+        if apify_api_key:
+            try:
+                self.apify_scraper = ApifyScraperTool(api_key=apify_api_key)
+            except ValueError:
+                # Apify key not valid, will use basic scraper
+                pass
 
     async def execute(
         self,
@@ -263,6 +274,7 @@ class SearchScraperAgent(BaseAgent):
     ) -> list[dict]:
         """
         Scrape content from top search result URLs.
+        Uses Apify for advanced scraping if available, otherwise falls back to basic scraper.
 
         Args:
             sources: List of source dictionaries with 'url' field
@@ -287,9 +299,12 @@ class SearchScraperAgent(BaseAgent):
         if not urls:
             return []
 
+        # Choose scraper - prefer Apify if available
+        scraper = self.apify_scraper if self.apify_scraper else self.web_scraper
+
         # Scrape all URLs in parallel
         scrape_tasks = [
-            self.web_scraper.execute(url=url, max_length=6000)
+            scraper.execute(url=url, max_length=6000)
             for url in urls
         ]
 

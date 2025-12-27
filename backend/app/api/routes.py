@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict
 import json
 import httpx
 import uuid
@@ -136,6 +136,16 @@ class ChatRequest(BaseModel):
     master_agent_system_prompt: Optional[str] = None  # System prompt for MasterAgent
     planner_agent_system_prompt: Optional[str] = None  # System prompt for PlannerAgent
     search_scraper_agent_system_prompt: Optional[str] = None  # System prompt for SearchScraperAgent
+    # API Keys (configurable via settings)
+    tavily_api_key: Optional[str] = None  # Tavily API key for web search
+    serpapi_api_key: Optional[str] = None  # SerpAPI key for Google search
+    apify_api_key: Optional[str] = None  # Apify API key for web scraping
+    # Database connections
+    database_connections: Optional[List[Dict]] = None  # Database connection configurations
+    # Database agent configuration
+    database_agent_provider: Optional[Literal["openai", "anthropic", "openrouter"]] = None  # Provider for DatabaseAgent
+    database_agent_model: Optional[str] = None  # Model for DatabaseAgent
+    database_agent_system_prompt: Optional[str] = None  # System prompt for DatabaseAgent
 
 
 class ChatResponse(BaseModel):
