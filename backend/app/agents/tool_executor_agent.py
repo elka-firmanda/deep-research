@@ -65,7 +65,7 @@ class ToolExecutorAgent(BaseAgent):
         """
         # Create descriptive message based on tool
         tool_descriptions = {
-            "get_current_datetime": f"Checking current date and time ({self.timezone})",
+            "get_current_datetime": f"Getting current date/time in {self.timezone}",
             "calculator": "Performing calculation",
         }
         detail = tool_descriptions.get(tool_name, f"Running {tool_name}")
@@ -76,6 +76,8 @@ class ToolExecutorAgent(BaseAgent):
             detail=detail,
             progress=10,
             source="tool_executor_agent",
+            agent_name="ToolExecutorAgent",
+            agent_icon="🔧",
         )
 
         if tool_name not in self.tools:
@@ -83,9 +85,11 @@ class ToolExecutorAgent(BaseAgent):
             self._emit_progress(
                 step="tool_executor_error",
                 status="failed",
-                detail=error_msg,
+                detail="Tool not found",
                 progress=100,
                 source="tool_executor_agent",
+                agent_name="ToolExecutorAgent",
+                agent_icon="🔧",
             )
             return ToolResult(
                 success=False,
@@ -108,9 +112,11 @@ class ToolExecutorAgent(BaseAgent):
             self._emit_progress(
                 step="tool_executor_complete",
                 status="completed",
-                detail=f"Successfully executed {tool_name}",
+                detail=f"Completed {tool_name}",
                 progress=100,
                 source="tool_executor_agent",
+                agent_name="ToolExecutorAgent",
+                agent_icon="🔧",
             )
 
             return result
@@ -120,9 +126,11 @@ class ToolExecutorAgent(BaseAgent):
             self._emit_progress(
                 step="tool_executor_error",
                 status="failed",
-                detail=error_msg,
+                detail=f"Error in {tool_name}",
                 progress=100,
                 source="tool_executor_agent",
+                agent_name="ToolExecutorAgent",
+                agent_icon="🔧",
             )
             return ToolResult(
                 success=False,

@@ -110,28 +110,28 @@ export default function Sidebar({
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed left-3 top-3 z-50 p-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+          className="fixed left-3 top-3 z-50 p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors"
           title="Open sidebar"
         >
-          <PanelLeft className="w-5 h-5 text-gray-300" />
+          <PanelLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
         </button>
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed left-0 top-0 h-full bg-gray-900 border-r border-gray-700 z-40 transition-all duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 z-40 transition-all duration-300 ease-in-out ${
           isOpen ? 'w-72 translate-x-0' : 'w-72 -translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-700">
-          <h2 className="text-sm font-semibold text-gray-200">Chat History</h2>
+        <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Chat History</h2>
           <button
             onClick={onToggle}
-            className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
             title="Close sidebar"
           >
-            <PanelLeftClose className="w-5 h-5 text-gray-400" />
+            <PanelLeftClose className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -150,13 +150,13 @@ export default function Sidebar({
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-gray-500 dark:text-gray-400" />
             </div>
           ) : conversations.length === 0 ? (
             <div className="text-center py-8 px-4">
-              <MessageSquare className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+              <MessageSquare className="w-10 h-10 text-gray-400 dark:text-gray-600 mx-auto mb-3" />
               <p className="text-sm text-gray-500">No conversations yet</p>
-              <p className="text-xs text-gray-600 mt-1">Start a new chat to begin</p>
+              <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">Start a new chat to begin</p>
             </div>
           ) : (
             Object.entries(groupedConversations).map(([dateKey, convs]) => (
@@ -171,8 +171,8 @@ export default function Sidebar({
                     onClick={() => onSelectConversation(conv.id)}
                     className={`w-full flex items-start gap-2 px-3 py-2.5 rounded-lg text-left transition-colors group ${
                       currentConversationId === conv.id
-                        ? 'bg-gray-700 text-white'
-                        : 'text-gray-300 hover:bg-gray-800'
+                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >
                     <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-500" />
@@ -181,13 +181,13 @@ export default function Sidebar({
                     </span>
                     <button
                       onClick={(e) => handleDelete(e, conv.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-600 rounded transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-all"
                       title="Delete conversation"
                     >
                       {deletingId === conv.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500 dark:text-gray-400" />
                       ) : (
-                        <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-red-400" />
+                        <Trash2 className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400" />
                       )}
                     </button>
                   </button>

@@ -34,6 +34,8 @@ class BaseAgent(ABC):
         detail: str = "",
         progress: int = 0,
         source: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        agent_icon: Optional[str] = None,
     ):
         """
         Emit a progress event.
@@ -44,6 +46,8 @@ class BaseAgent(ABC):
             detail: Detailed description of what's happening
             progress: Progress percentage (0-100)
             source: Optional source identifier (e.g., "planner_agent")
+            agent_name: Human-readable agent name (e.g., "PlannerAgent")
+            agent_icon: Emoji icon for the agent (e.g., "📋")
         """
         if self.progress_callback:
             event = {
@@ -55,6 +59,10 @@ class BaseAgent(ABC):
             }
             if source:
                 event["source"] = source
+            if agent_name:
+                event["agent_name"] = agent_name
+            if agent_icon:
+                event["agent_icon"] = agent_icon
 
             self.progress_callback(event)
 

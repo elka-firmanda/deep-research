@@ -68,6 +68,8 @@ export interface ProgressEvent {
   tool?: string
   arguments?: Record<string, unknown> | undefined
   source?: string  // Source subagent: 'planner_agent', 'search_scraper_agent', 'tool_executor_agent', 'master_agent'
+  agent_name?: string  // Human-readable agent name (e.g., "PlannerAgent", "SearchScraperAgent")
+  agent_icon?: string  // Emoji icon for the agent (e.g., "📋", "🔍")
 }
 
 export interface Conversation {

@@ -4,6 +4,7 @@ import ChatPage from './pages/ChatPage'
 import SettingsPage from './pages/SettingsPage'
 import { Settings, ApiStatus } from './lib/types'
 import { ChatProvider } from './contexts/ChatContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 
 const DEFAULT_SYSTEM_PROMPT = `You are an expert research assistant that produces comprehensive, well-sourced research reports. Your responses should read like Wikipedia articles or academic research summaries.
 
@@ -158,18 +159,21 @@ function App() {
 
   if (!isInitialized) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
+      <ThemeProvider>
+        <div className="flex h-screen items-center justify-center bg-white dark:bg-gray-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     )
   }
 
   return (
-    <BrowserRouter>
-      <ChatProvider>
+    <ThemeProvider>
+      <BrowserRouter>
+        <ChatProvider>
         <Routes>
         <Route 
           path="/" 
@@ -193,9 +197,10 @@ function App() {
             />
           } 
         />
-      </Routes>
-      </ChatProvider>
-    </BrowserRouter>
+        </Routes>
+        </ChatProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

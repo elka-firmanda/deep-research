@@ -130,9 +130,11 @@ class MasterAgent(BaseAgent):
                 "type": "progress",
                 "step": "analyzing",
                 "status": "in_progress",
-                "detail": f"Understanding: \"{query_preview}\"",
+                "detail": f"Analyzing query to determine best approach...",
                 "progress": 5,
                 "source": "master_agent",
+                "agent_name": "MasterAgent",
+                "agent_icon": "🎯",
             }
 
             analysis = await self.analyzer.analyze(message, self.messages)
@@ -140,11 +142,11 @@ class MasterAgent(BaseAgent):
             # Build descriptive routing message
             subagents_desc = []
             if "planner" in analysis.required_subagents:
-                subagents_desc.append("creating research plan")
+                subagents_desc.append("📋 PlannerAgent")
             if "search_scraper" in analysis.required_subagents:
-                subagents_desc.append("searching the web")
+                subagents_desc.append("🔍 SearchScraperAgent")
             if "tool_executor" in analysis.required_subagents:
-                subagents_desc.append("checking current date/time")
+                subagents_desc.append("🔧 ToolExecutorAgent")
 
             routing_detail = " → ".join(subagents_desc) if subagents_desc else "processing"
 
@@ -153,9 +155,11 @@ class MasterAgent(BaseAgent):
                 "type": "progress",
                 "step": "routing",
                 "status": "in_progress",
-                "detail": f"Strategy: {routing_detail}",
+                "detail": f"Routing to: {routing_detail}",
                 "progress": 10,
                 "source": "master_agent",
+                "agent_name": "MasterAgent",
+                "agent_icon": "🎯",
             }
 
             # Execute appropriate routing strategy
@@ -174,9 +178,11 @@ class MasterAgent(BaseAgent):
                 "type": "progress",
                 "step": "synthesizing",
                 "status": "in_progress",
-                "detail": f"Writing comprehensive response from {successful_count} sources...",
+                "detail": f"Synthesizing response from {successful_count} subagent results...",
                 "progress": 90,
                 "source": "master_agent",
+                "agent_name": "MasterAgent",
+                "agent_icon": "🎯",
             }
 
             final_response = await self._synthesize_results(message, results, analysis)
@@ -184,7 +190,14 @@ class MasterAgent(BaseAgent):
             # Add assistant message to history
             self.messages.append({"role": "assistant", "content": final_response})
 
-            # Step 4: Yield final response
+            # Step 4: Stream response chunks for progressive display
+            chunk_size = 20  # Characters per chunk for smooth streaming effect
+            for i in range(0, len(final_response), chunk_size):
+                chunk = final_response[i:i + chunk_size]
+                yield {"type": "response_chunk", "content": chunk}
+                await asyncio.sleep(0.01)
+
+            # Yield final complete response for backward compatibility
             yield {"type": "response", "content": final_response}
             yield {"type": "done"}
 
