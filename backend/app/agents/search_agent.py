@@ -401,7 +401,7 @@ class SearchAgent:
                         "progress": 0,
                     }
                 else:
-                    # Final response - show writing progress
+                    # Final response - stream it token by token
                     yield {
                         "type": "progress",
                         "step": "writing",
@@ -410,9 +410,12 @@ class SearchAgent:
                         "progress": 0,
                     }
 
-                    final_response = (
-                        response if isinstance(response, str) else str(response)
-                    )
+                    # Check if this was already a complete response (non-streaming)
+                    if isinstance(response, str):
+                        # Non-streaming response - yield as chunks for consistency
+                        final_response = response
+                    else:
+                        final_response = str(response)
 
                     # Clean up any tool invocation artifacts from the response
                     import re
@@ -423,19 +426,19 @@ class SearchAgent:
                     # Clean up extra whitespace
                     final_response = re.sub(r'\n\s*\n\s*\n', '\n\n', final_response).strip()
 
-                    # Show formatting progress
-                    yield {
-                        "type": "progress",
-                        "step": "formatting",
-                        "status": "in_progress",
-                        "detail": "Formatting the response...",
-                        "progress": 0,
-                    }
+                    # Stream the response in chunks for progressive display
+                    chunk_size = 20  # Characters per chunk for smooth streaming effect
+                    for i in range(0, len(final_response), chunk_size):
+                        chunk = final_response[i:i + chunk_size]
+                        yield {"type": "response_chunk", "content": chunk}
+                        # Small delay to create streaming effect
+                        await asyncio.sleep(0.01)
 
                     self.messages.append(
                         {"role": "assistant", "content": final_response}
                     )
 
+                    # Yield final complete response for backward compatibility
                     yield {"type": "response", "content": final_response}
                     yield {"type": "done"}
                     return

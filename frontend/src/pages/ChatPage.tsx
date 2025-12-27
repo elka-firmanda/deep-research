@@ -151,6 +151,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
     const streamId = streamManager.generateId()
     let streamRegistered = false
     let finalResponse = ''
+    let streamingContent = ''
+    let streamingMessageId = ''
     let buffer = ''
     let messageAdded = false
 
@@ -205,7 +207,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       streamManager.startStream(streamId, abortController, reader, conversationId)
       streamRegistered = true
 
-      const processEvent = (event: { type: string; content?: string; step?: string; status?: string; detail?: string; progress?: number; tool?: string; arguments?: unknown; conversation_id?: string }) => {
+      const processEvent = (event: { type: string; content?: string; step?: string; status?: string; detail?: string; progress?: number; tool?: string; arguments?: unknown; conversation_id?: string; agent_name?: string; agent_icon?: string }) => {
         switch (event.type) {
           case 'progress':
             setCurrentProgress({
@@ -213,9 +215,11 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
               status: event.status || '',
               detail: event.detail || '',
               progress: event.progress || 0,
+              agent_name: event.agent_name,
+              agent_icon: event.agent_icon,
             })
             break
-          
+
           case 'tool_call':
             setCurrentProgress({
               step: 'tool_call',
@@ -224,20 +228,62 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
               progress: 0,
               tool: event.tool,
               arguments: (event.arguments as Record<string, unknown> | undefined) || {},
+              agent_name: event.agent_name,
+              agent_icon: event.agent_icon,
             })
             break
-          
+
           case 'thinking':
             setCurrentProgress({
               step: 'thinking',
               status: 'in_progress',
               detail: event.content || '',
               progress: 0,
+              agent_name: event.agent_name,
+              agent_icon: event.agent_icon,
             })
             break
-          
+
+          case 'response_chunk':
+            // Accumulate streaming content
+            streamingContent += event.content || ''
+            // Create or update streaming message
+            if (!streamingMessageId) {
+              streamingMessageId = (Date.now() + 1).toString()
+              const streamingMessage: Message = {
+                id: streamingMessageId,
+                role: 'assistant',
+                content: streamingContent,
+                timestamp: new Date(),
+              }
+              setMessages(prev => [...prev, streamingMessage])
+              messageAdded = true
+              // Clear progress when streaming starts
+              setCurrentProgress(null)
+            } else {
+              // Update existing streaming message
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === streamingMessageId
+                    ? { ...msg, content: streamingContent }
+                    : msg
+                )
+              )
+            }
+            break
+
           case 'response':
+            // Final complete response - update the streaming message if it exists
             finalResponse = event.content || ''
+            if (streamingMessageId) {
+              setMessages(prev =>
+                prev.map(msg =>
+                  msg.id === streamingMessageId
+                    ? { ...msg, content: finalResponse }
+                    : msg
+                )
+              )
+            }
             break
           
           case 'conversation_id':
@@ -247,7 +293,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             break
           
           case 'done':
-            if (finalResponse) {
+            // Only add new message if we didn't stream chunks
+            if (finalResponse && !messageAdded) {
               const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -304,6 +351,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         }
       }
 
+      // Backup: add message if we got a response but didn't add it via streaming or done event
       if (finalResponse && !messageAdded) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -312,8 +360,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
           timestamp: new Date(),
         }
         setMessages(prev => [...prev, assistantMessage])
-        setCurrentProgress(null)
       }
+      setCurrentProgress(null)
     } catch (error) {
       // Only show error if it's not an abort (which happens when navigating away)
       if (!abortController.signal.aborted) {
@@ -410,7 +458,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white">
+    <div className="flex h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -424,16 +472,16 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       {/* Main Content */}
       <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'lg:ml-72' : ''}`}>
         {/* Header */}
-        <header className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-700 bg-gray-800">
+        <header className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Spacer for sidebar toggle button when closed */}
             {!sidebarOpen && <div className="w-10" />}
             <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-semibold">AI Research Agent</h1>
-              <p className="text-xs text-gray-400 hidden sm:block">
+              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
                 {settings.provider} / {settings.model || 'default'}
                 {settings.deepResearch && ' • Deep Research'}
               </p>
@@ -443,7 +491,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             {messages.length > 0 && (
               <button
                 onClick={clearChat}
-                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 title="Clear chat"
               >
                 <Trash2 className="w-5 h-5" />
@@ -451,7 +499,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             )}
             <Link
               to="/settings"
-              className="flex items-center gap-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <Settings className="w-5 h-5" />
               <span className="hidden sm:inline text-sm">Settings</span>
@@ -460,17 +508,17 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
         </header>
 
       {/* Status bar (mobile) */}
-      <div className="sm:hidden px-3 py-2 bg-gray-800/50 border-b border-gray-700 text-xs text-gray-400 flex items-center gap-2 overflow-x-auto">
+      <div className="sm:hidden px-3 py-2 bg-gray-100/50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 overflow-x-auto">
         <span className="flex items-center gap-1 flex-shrink-0">
           <span className={'w-2 h-2 rounded-full ' + (apiStatus?.status === 'ok' ? 'bg-green-500' : 'bg-red-500')} />
           {settings.provider}
         </span>
-        <span className="text-gray-600">|</span>
+        <span className="text-gray-400 dark:text-gray-600">|</span>
         <span className="truncate">{settings.model || 'default model'}</span>
         {settings.deepResearch && (
           <>
-            <span className="text-gray-600">|</span>
-            <span className="text-purple-400 flex-shrink-0">Deep Research</span>
+            <span className="text-gray-400 dark:text-gray-600">|</span>
+            <span className="text-purple-500 dark:text-purple-400 flex-shrink-0">Deep Research</span>
           </>
         )}
       </div>
@@ -482,8 +530,8 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             <div className="text-center max-w-2xl mx-auto">
               <div className="text-5xl sm:text-6xl mb-4">🔍</div>
               <h2 className="text-xl sm:text-2xl font-bold mb-2">AI Research Agent</h2>
-              <p className="text-gray-400 text-sm sm:text-base mb-6 px-4">
-                Your intelligent research assistant. Ask questions, explore topics, 
+              <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base mb-6 px-4">
+                Your intelligent research assistant. Ask questions, explore topics,
                 and get comprehensive answers with real sources.
               </p>
               
@@ -524,7 +572,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             )}
             
             {isLoading && !currentProgress && (
-              <div className="flex items-center gap-2 text-gray-400 px-2">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 px-2">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Starting...</span>
               </div>
@@ -536,7 +584,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-700 bg-gray-800/50 p-3 sm:p-4">
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 p-3 sm:p-4">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
           <div className="flex gap-2 sm:gap-3 items-end">
             <div className="flex-1 relative">
@@ -546,14 +594,14 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask anything... research topics, compare options, explain concepts"
-                className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 pr-12 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[48px] max-h-[200px]"
+                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-h-[48px] max-h-[200px]"
                 rows={1}
                 disabled={isLoading}
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="absolute right-2 bottom-2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="absolute right-2 bottom-2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors text-white"
               >
                 {isLoading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -576,8 +624,16 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
 function ProgressCard({ progress }: { progress: ProgressEvent }) {
   return (
     <div className="flex items-center gap-3 px-2 py-2">
-      <Loader2 className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0" />
-      <span className="text-sm text-gray-300">{progress.detail}</span>
+      <Loader2 className="w-5 h-5 animate-spin text-blue-500 dark:text-blue-400 flex-shrink-0" />
+      <div className="flex items-center gap-2 text-sm">
+        {progress.agent_icon && progress.agent_name && (
+          <span className="font-medium text-gray-700 dark:text-gray-200">
+            {progress.agent_icon} {progress.agent_name}
+          </span>
+        )}
+        {progress.agent_name && <span className="text-gray-400 dark:text-gray-500">|</span>}
+        <span className="text-gray-600 dark:text-gray-300">{progress.detail}</span>
+      </div>
     </div>
   )
 }
@@ -599,16 +655,16 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
     <div className="relative group">
       <button
         onClick={handleCopy}
-        className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-2 right-2 p-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
         title={copied ? 'Copied!' : 'Copy code'}
       >
         {copied ? (
-          <Check className="w-4 h-4 text-green-400" />
+          <Check className="w-4 h-4 text-green-500 dark:text-green-400" />
         ) : (
-          <Copy className="w-4 h-4 text-gray-300" />
+          <Copy className="w-4 h-4 text-gray-600 dark:text-gray-300" />
         )}
       </button>
-      <pre ref={preRef} className="bg-gray-900 rounded-lg overflow-x-auto my-3 sm:my-4 -mx-4 sm:mx-0">
+      <pre ref={preRef} className="bg-gray-100 dark:bg-gray-900 rounded-lg overflow-x-auto my-3 sm:my-4 -mx-4 sm:mx-0">
         {children}
       </pre>
     </div>
@@ -625,8 +681,8 @@ function MessageBubble({ message }: { message: Message }) {
           (isUser
             ? 'bg-blue-600 text-white max-w-[85%] sm:max-w-[75%]'
             : message.isError
-            ? 'bg-red-900/50 border border-red-700 max-w-full'
-            : 'bg-gray-800 border border-gray-700 max-w-full'
+            ? 'bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 max-w-full'
+            : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 max-w-full'
           )}
         style={{ fontFamily: 'Inter, sans-serif' }}
       >
@@ -640,42 +696,42 @@ function MessageBubble({ message }: { message: Message }) {
               components={{
                 table: ({ children }) => (
                   <div className="overflow-x-auto my-4 -mx-4 px-4">
-                    <table className="min-w-full border-collapse border border-gray-600 text-sm">
+                    <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm">
                       {children}
                     </table>
                   </div>
                 ),
                 thead: ({ children }) => (
-                  <thead className="bg-gray-700">{children}</thead>
+                  <thead className="bg-gray-200 dark:bg-gray-700">{children}</thead>
                 ),
                 tbody: ({ children }) => (
-                  <tbody className="divide-y divide-gray-600">{children}</tbody>
+                  <tbody className="divide-y divide-gray-300 dark:divide-gray-600">{children}</tbody>
                 ),
                 tr: ({ children }) => (
-                  <tr className="hover:bg-gray-700/50">{children}</tr>
+                  <tr className="hover:bg-gray-200/50 dark:hover:bg-gray-700/50">{children}</tr>
                 ),
                 th: ({ children }) => (
-                  <th className="px-3 py-2 text-left text-xs sm:text-sm font-semibold text-gray-200 border border-gray-600">
+                  <th className="px-3 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600">
                     {children}
                   </th>
                 ),
                 td: ({ children }) => (
-                  <td className="px-3 py-2 text-xs sm:text-sm text-gray-300 border border-gray-600">
+                  <td className="px-3 py-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
                     {children}
                   </td>
                 ),
                 a: ({ href, children }) => {
                   const childText = String(children)
                   const isCitation = /^\[\d+\]$/.test(childText)
-                  
+
                   return (
-                    <a 
-                      href={href} 
-                      target="_blank" 
+                    <a
+                      href={href}
+                      target="_blank"
                       rel="noopener noreferrer"
-                      className={isCitation 
-                        ? "text-blue-400 hover:text-blue-300 no-underline font-medium"
-                        : "text-blue-400 hover:text-blue-300 underline break-all"
+                      className={isCitation
+                        ? "text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 no-underline font-medium"
+                        : "text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline break-all"
                       }
                       title={href}
                     >
@@ -684,18 +740,18 @@ function MessageBubble({ message }: { message: Message }) {
                   )
                 },
                 sup: ({ children }) => (
-                  <sup className="text-xs text-blue-400 ml-0.5 cursor-pointer hover:text-blue-300">
+                  <sup className="text-xs text-blue-600 dark:text-blue-400 ml-0.5 cursor-pointer hover:text-blue-500 dark:hover:text-blue-300">
                     {children}
                   </sup>
                 ),
                 code: ({ className, children, ...props }) => {
                   const isInline = !className
                   return isInline ? (
-                    <code className="bg-gray-700 px-1.5 py-0.5 rounded text-xs sm:text-sm text-pink-300 break-all" {...props}>
+                    <code className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs sm:text-sm text-pink-600 dark:text-pink-300 break-all" {...props}>
                       {children}
                     </code>
                   ) : (
-                    <code className={(className || '') + ' block bg-gray-900 p-3 sm:p-4 rounded-lg overflow-x-auto text-xs sm:text-sm'} {...props}>
+                    <code className={(className || '') + ' block bg-gray-100 dark:bg-gray-900 p-3 sm:p-4 rounded-lg overflow-x-auto text-xs sm:text-sm'} {...props}>
                       {children}
                     </code>
                   )
@@ -710,27 +766,27 @@ function MessageBubble({ message }: { message: Message }) {
                   <ol className="list-decimal list-outside space-y-1 my-2 ml-5">{children}</ol>
                 ),
                 li: ({ children }) => (
-                  <li className="text-gray-300 pl-1">{children}</li>
+                  <li className="text-gray-600 dark:text-gray-300 pl-1">{children}</li>
                 ),
                 h1: ({ children }) => (
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-100 mt-6 mb-3">{children}</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mt-6 mb-3">{children}</h1>
                 ),
                 h2: ({ children }) => (
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-100 mt-5 mb-2">{children}</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mt-5 mb-2">{children}</h2>
                 ),
                 h3: ({ children }) => (
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-100 mt-4 mb-2">{children}</h3>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mt-4 mb-2">{children}</h3>
                 ),
                 p: ({ children }) => (
-                  <p className="text-gray-300 my-2 leading-relaxed">{children}</p>
+                  <p className="text-gray-600 dark:text-gray-300 my-2 leading-relaxed">{children}</p>
                 ),
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-gray-500 pl-3 sm:pl-4 my-4 text-gray-400 italic">
+                  <blockquote className="border-l-4 border-gray-400 dark:border-gray-500 pl-3 sm:pl-4 my-4 text-gray-500 dark:text-gray-400 italic">
                     {children}
                   </blockquote>
                 ),
                 hr: () => (
-                  <hr className="border-gray-600 my-4 sm:my-6" />
+                  <hr className="border-gray-300 dark:border-gray-600 my-4 sm:my-6" />
                 ),
               }}
             >
@@ -747,12 +803,12 @@ function ExamplePrompt({ icon, text, onClick }: { icon: React.ReactNode; text: s
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 text-left px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl transition-colors group"
+      className="flex items-center gap-3 text-left px-4 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-xl transition-colors group"
     >
-      <div className="p-2 bg-gray-700 group-hover:bg-gray-600 rounded-lg text-gray-400 group-hover:text-gray-300 transition-colors">
+      <div className="p-2 bg-gray-200 dark:bg-gray-700 group-hover:bg-gray-300 dark:group-hover:bg-gray-600 rounded-lg text-gray-500 dark:text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
         {icon}
       </div>
-      <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{text}</span>
+      <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{text}</span>
     </button>
   )
 }

@@ -64,13 +64,15 @@ class PlannerAgent(BaseAgent):
         Returns:
             ToolResult containing the research plan
         """
-        query_preview = query[:40] + "..." if len(query) > 40 else query
+        query_preview = query[:50] + "..." if len(query) > 50 else query
         self._emit_progress(
             step="planner_analyzing",
             status="in_progress",
-            detail=f"Analyzing: \"{query_preview}\"",
+            detail=f"Analyzing query to create research strategy...",
             progress=10,
             source="planner_agent",
+            agent_name="PlannerAgent",
+            agent_icon="📋",
         )
 
         # Build context from conversation history
@@ -116,9 +118,11 @@ Generate the plan now:"""
             self._emit_progress(
                 step="planner_generating",
                 status="in_progress",
-                detail=f"Creating {num_steps}-step research strategy...",
+                detail=f"Creating {num_steps}-step research plan for '{query_preview}'",
                 progress=40,
                 source="planner_agent",
+                agent_name="PlannerAgent",
+                agent_icon="📋",
             )
 
             # Call LLM to generate plan
@@ -140,9 +144,11 @@ Generate the plan now:"""
             self._emit_progress(
                 step="planner_complete",
                 status="completed",
-                detail=f"Plan ready: {steps_count} steps to {goal}...",
+                detail=f"Research plan ready with {steps_count} steps",
                 progress=100,
                 source="planner_agent",
+                agent_name="PlannerAgent",
+                agent_icon="📋",
             )
 
             return ToolResult(
@@ -155,9 +161,11 @@ Generate the plan now:"""
             self._emit_progress(
                 step="planner_error",
                 status="failed",
-                detail=error_msg,
+                detail="Failed to generate research plan",
                 progress=100,
                 source="planner_agent",
+                agent_name="PlannerAgent",
+                agent_icon="📋",
             )
             return ToolResult(
                 success=False,
@@ -170,9 +178,11 @@ Generate the plan now:"""
             self._emit_progress(
                 step="planner_error",
                 status="failed",
-                detail=error_msg,
+                detail="Error during planning phase",
                 progress=100,
                 source="planner_agent",
+                agent_name="PlannerAgent",
+                agent_icon="📋",
             )
             return ToolResult(
                 success=False,

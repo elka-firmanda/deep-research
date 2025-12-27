@@ -91,15 +91,17 @@ class SearchScraperAgent(BaseAgent):
         Returns:
             ToolResult containing aggregated results
         """
-        query_preview = query[:40] + "..." if len(query) > 40 else query
+        query_preview = query[:50] + "..." if len(query) > 50 else query
         plan_goal = plan.get("goal", "research")[:50] if plan.get("goal") else "research"
 
         self._emit_progress(
             step="search_scraper_start",
             status="in_progress",
-            detail=f"Executing research plan: {plan_goal}",
+            detail=f"Starting research: {plan_goal}",
             progress=5,
             source="search_scraper_agent",
+            agent_name="SearchScraperAgent",
+            agent_icon="🔍",
         )
 
         steps = plan.get("steps", [])
@@ -114,12 +116,16 @@ class SearchScraperAgent(BaseAgent):
             description = step.get("description", "")
             search_queries = step.get("search_queries", [])
 
+            # Show the search queries being executed
+            query_sample = search_queries[0][:40] + "..." if search_queries and len(search_queries[0]) > 40 else (search_queries[0] if search_queries else description)
             self._emit_progress(
                 step="search_scraper_step",
                 status="in_progress",
-                detail=f"Step {step_num}/{total_steps}: {description}",
+                detail=f"Searching '{query_sample}' ({step_num}/{total_steps})",
                 progress=int(10 + (i / total_steps) * 70),
                 source="search_scraper_agent",
+                agent_name="SearchScraperAgent",
+                agent_icon="🔍",
             )
 
             if action == "search" and search_queries:
@@ -138,9 +144,11 @@ class SearchScraperAgent(BaseAgent):
             self._emit_progress(
                 step="search_scraper_scraping",
                 status="in_progress",
-                detail=f"Reading content from {min(5, len(all_sources))} top sources...",
+                detail=f"Reading {min(5, len(all_sources))} pages in detail...",
                 progress=85,
                 source="search_scraper_agent",
+                agent_name="SearchScraperAgent",
+                agent_icon="🔍",
             )
 
             scraped_content = await self._scrape_top_results(all_sources, max_pages=5)
@@ -150,9 +158,11 @@ class SearchScraperAgent(BaseAgent):
         self._emit_progress(
             step="search_scraper_complete",
             status="completed",
-            detail=f"Research complete: {len(all_sources)} sources found",
+            detail=f"Found {len(all_sources)} sources, read {len(scraped_content)} pages",
             progress=100,
             source="search_scraper_agent",
+            agent_name="SearchScraperAgent",
+            agent_icon="🔍",
         )
 
         return ToolResult(
@@ -183,9 +193,11 @@ class SearchScraperAgent(BaseAgent):
         self._emit_progress(
             step="search_scraper_start",
             status="in_progress",
-            detail=f"Researching: \"{query_preview}\"",
+            detail=f"Researching '{query_preview}'",
             progress=5,
             source="search_scraper_agent",
+            agent_name="SearchScraperAgent",
+            agent_icon="🔍",
         )
 
         # Delegate to DeepSearchTool
@@ -194,9 +206,11 @@ class SearchScraperAgent(BaseAgent):
         self._emit_progress(
             step="search_scraper_complete",
             status="completed" if result.success else "failed",
-            detail="Autonomous research complete" if result.success else "Research failed",
+            detail="Research complete" if result.success else "Research encountered errors",
             progress=100,
             source="search_scraper_agent",
+            agent_name="SearchScraperAgent",
+            agent_icon="🔍",
         )
 
         return result
@@ -214,8 +228,10 @@ class SearchScraperAgent(BaseAgent):
         self._emit_progress(
             step="search_scraper_searching",
             status="in_progress",
-            detail=f"Searching {len(queries)} queries...",
+            detail=f"Running {len(queries)} search queries in parallel...",
             source="search_scraper_agent",
+            agent_name="SearchScraperAgent",
+            agent_icon="🔍",
         )
 
         # Execute all searches in parallel

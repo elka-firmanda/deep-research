@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-900 text-gray-100;
+  @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
 }
 
 /* Custom scrollbar */
@@ -12,20 +12,20 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-800;
+  @apply bg-gray-100 dark:bg-gray-800;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-600 rounded-full;
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
+  @apply bg-gray-400 dark:bg-gray-500;
 }
 
 /* Markdown content styles */
 .markdown-content {
-  @apply text-gray-200 leading-relaxed;
+  @apply text-gray-800 dark:text-gray-200 leading-relaxed;
 }
 
 .markdown-content > *:first-child {
@@ -43,16 +43,16 @@ body {
 
 /* Code syntax highlighting placeholder */
 .markdown-content pre code {
-  @apply text-gray-300;
+  @apply text-gray-700 dark:text-gray-300;
 }
 
 /* Strong and emphasis */
 .markdown-content strong {
-  @apply font-semibold text-gray-100;
+  @apply font-semibold text-gray-900 dark:text-gray-100;
 }
 
 .markdown-content em {
-  @apply italic text-gray-300;
+  @apply italic text-gray-700 dark:text-gray-300;
 }
 
 /* Citation superscripts - Wikipedia style */
@@ -61,7 +61,7 @@ body {
 }
 
 .markdown-content sup a {
-  @apply text-blue-400 hover:text-blue-300 no-underline font-normal;
+  @apply text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 no-underline font-normal;
   font-size: 0.75rem;
 }
 
