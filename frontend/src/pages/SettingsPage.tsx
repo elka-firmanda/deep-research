@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, X, RefreshCw, FileText, RotateCcw, ChevronDown, ChevronUp, Search, Globe, Sparkles, Layers, Wrench, Sun, Moon } from 'lucide-react'
-import { Settings, ApiStatus, ModelInfo } from '../lib/types'
+import { ArrowLeft, Check, X, RefreshCw, FileText, RotateCcw, ChevronDown, ChevronUp, Search, Globe, Sparkles, Layers, Wrench, Sun, Moon, Key, Database, Plus, Trash } from 'lucide-react'
+import { Settings, ApiStatus, ModelInfo, DatabaseConnection } from '../lib/types'
 import SearchableSelect, { SelectOption } from '../components/SearchableSelect'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -425,6 +425,315 @@ export default function SettingsPage({
             </div>
           </section>
 
+          {/* API Keys Section */}
+          <section className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 sm:p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              API Keys
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Configure API keys for search and scraping services. These are stored locally in your settings.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Tavily API Key
+                </label>
+                <input
+                  type="password"
+                  value={settings.tavilyApiKey || ''}
+                  onChange={(e) => onSettingsChange({ ...settings, tavilyApiKey: e.target.value || undefined })}
+                  placeholder="Enter Tavily API key"
+                  className="w-full h-[50px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Used for AI-optimized web search. Get your key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">tavily.com</a>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  SerpAPI Key
+                </label>
+                <input
+                  type="password"
+                  value={settings.serpapiApiKey || ''}
+                  onChange={(e) => onSettingsChange({ ...settings, serpapiApiKey: e.target.value || undefined })}
+                  placeholder="Enter SerpAPI key"
+                  className="w-full h-[50px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Used for Google search results. Get your key at <a href="https://serpapi.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">serpapi.com</a>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Apify API Key
+                </label>
+                <input
+                  type="password"
+                  value={settings.apifyApiKey || ''}
+                  onChange={(e) => onSettingsChange({ ...settings, apifyApiKey: e.target.value || undefined })}
+                  placeholder="Enter Apify API key"
+                  className="w-full h-[50px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Used for advanced web scraping. Get your key at <a href="https://apify.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">apify.com</a>
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Database Connections Section */}
+          <section className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Database className="w-5 h-5" />
+                Database Connections
+              </h2>
+              <button
+                onClick={() => {
+                  const newConnection: DatabaseConnection = {
+                    name: 'New Connection',
+                    type: 'postgres',
+                  }
+                  onSettingsChange({
+                    ...settings,
+                    databaseConnections: [...(settings.databaseConnections || []), newConnection]
+                  })
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Connection
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Configure database connections for querying data sources. Supports BigQuery, PostgreSQL, ClickHouse, and MySQL.
+            </p>
+
+            {(!settings.databaseConnections || settings.databaseConnections.length === 0) ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No database connections configured</p>
+                <p className="text-xs mt-1">Click "Add Connection" to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {settings.databaseConnections.map((conn, index) => (
+                  <div key={index} className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-300 dark:border-gray-600">
+                    <div className="flex items-start justify-between mb-3">
+                      <input
+                        type="text"
+                        value={conn.name}
+                        onChange={(e) => {
+                          const updated = [...(settings.databaseConnections || [])]
+                          updated[index] = { ...conn, name: e.target.value }
+                          onSettingsChange({ ...settings, databaseConnections: updated })
+                        }}
+                        className="text-base font-semibold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
+                        placeholder="Connection Name"
+                      />
+                      <button
+                        onClick={() => {
+                          const updated = settings.databaseConnections?.filter((_, i) => i !== index)
+                          onSettingsChange({ ...settings, databaseConnections: updated })
+                        }}
+                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors text-red-600 dark:text-red-400"
+                        title="Delete connection"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Database Type</label>
+                        <select
+                          value={conn.type}
+                          onChange={(e) => {
+                            const updated = [...(settings.databaseConnections || [])]
+                            updated[index] = { ...conn, type: e.target.value as DatabaseConnection['type'] }
+                            onSettingsChange({ ...settings, databaseConnections: updated })
+                          }}
+                          className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value="postgres">PostgreSQL</option>
+                          <option value="mysql">MySQL</option>
+                          <option value="clickhouse">ClickHouse</option>
+                          <option value="bigquery">BigQuery</option>
+                        </select>
+                      </div>
+
+                      {conn.type !== 'bigquery' && (
+                        <>
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Host</label>
+                            <input
+                              type="text"
+                              value={conn.host || ''}
+                              onChange={(e) => {
+                                const updated = [...(settings.databaseConnections || [])]
+                                updated[index] = { ...conn, host: e.target.value }
+                                onSettingsChange({ ...settings, databaseConnections: updated })
+                              }}
+                              placeholder="localhost"
+                              className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Port</label>
+                            <input
+                              type="number"
+                              value={conn.port || ''}
+                              onChange={(e) => {
+                                const updated = [...(settings.databaseConnections || [])]
+                                updated[index] = { ...conn, port: parseInt(e.target.value) || undefined }
+                                onSettingsChange({ ...settings, databaseConnections: updated })
+                              }}
+                              placeholder={conn.type === 'postgres' ? '5432' : conn.type === 'mysql' ? '3306' : '8123'}
+                              className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          {conn.type === 'bigquery' ? 'Project ID' : 'Database Name'}
+                        </label>
+                        <input
+                          type="text"
+                          value={conn.type === 'bigquery' ? (conn.project_id || '') : (conn.database || '')}
+                          onChange={(e) => {
+                            const updated = [...(settings.databaseConnections || [])]
+                            if (conn.type === 'bigquery') {
+                              updated[index] = { ...conn, project_id: e.target.value }
+                            } else {
+                              updated[index] = { ...conn, database: e.target.value }
+                            }
+                            onSettingsChange({ ...settings, databaseConnections: updated })
+                          }}
+                          placeholder={conn.type === 'bigquery' ? 'my-project-id' : 'database_name'}
+                          className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+
+                      {conn.type !== 'bigquery' && (
+                        <>
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Username</label>
+                            <input
+                              type="text"
+                              value={conn.username || ''}
+                              onChange={(e) => {
+                                const updated = [...(settings.databaseConnections || [])]
+                                updated[index] = { ...conn, username: e.target.value }
+                                onSettingsChange({ ...settings, databaseConnections: updated })
+                              }}
+                              placeholder="username"
+                              className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Password</label>
+                            <input
+                              type="password"
+                              value={conn.password || ''}
+                              onChange={(e) => {
+                                const updated = [...(settings.databaseConnections || [])]
+                                updated[index] = { ...conn, password: e.target.value }
+                                onSettingsChange({ ...settings, databaseConnections: updated })
+                              }}
+                              placeholder="••••••••"
+                              className="w-full h-[42px] bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {conn.type === 'bigquery' && (
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Service Account JSON (Credentials)</label>
+                          <textarea
+                            value={conn.credentials_json || ''}
+                            onChange={(e) => {
+                              const updated = [...(settings.databaseConnections || [])]
+                              updated[index] = { ...conn, credentials_json: e.target.value }
+                              onSettingsChange({ ...settings, databaseConnections: updated })
+                            }}
+                            placeholder='{"type": "service_account", "project_id": "...", ...}'
+                            className="w-full h-24 bg-gray-50 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Database Agent Configuration (shown when connections exist) */}
+            {settings.databaseConnections && settings.databaseConnections.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Database Agent Configuration</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                  Configure the AI agent responsible for querying databases and analyzing results.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
+                      <select
+                        value={settings.databaseAgentProvider || ''}
+                        onChange={(e) => {
+                          onSettingsChange({
+                            ...settings,
+                            databaseAgentProvider: e.target.value || undefined,
+                            databaseAgentModel: undefined,
+                          })
+                        }}
+                        className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      >
+                        <option value="">Use main provider ({settings.provider || 'none'})</option>
+                        {availableProviders.map((provider) => (
+                          <option key={provider.name} value={provider.name}>
+                            {provider.name.charAt(0).toUpperCase() + provider.name.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
+                      <SearchableSelect
+                        options={modelOptions}
+                        value={settings.databaseAgentModel || ''}
+                        onChange={(model) => onSettingsChange({ ...settings, databaseAgentModel: model })}
+                        placeholder={settings.model ? `${settings.model} (main)` : "Use main model"}
+                        isLoading={isLoadingModels}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">System Prompt (Optional)</label>
+                    <textarea
+                      value={settings.databaseAgentSystemPrompt || ''}
+                      onChange={(e) => onSettingsChange({ ...settings, databaseAgentSystemPrompt: e.target.value || undefined })}
+                      placeholder="Leave empty to use default database query prompt. Customize to guide SQL generation and result analysis."
+                      className="w-full h-20 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Research Mode Section */}
           <section className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 sm:p-6">
             <h2 className="text-lg font-semibold mb-4">Research Mode</h2>
@@ -539,7 +848,7 @@ export default function SettingsPage({
 
                 <div className="space-y-4">
                   {/* Master Agent Configuration */}
-                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -596,7 +905,7 @@ export default function SettingsPage({
                   </div>
 
                   {/* Planner Agent Configuration */}
-                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -653,7 +962,7 @@ export default function SettingsPage({
                   </div>
 
                   {/* SearchScraper Agent Configuration */}
-                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -710,7 +1019,7 @@ export default function SettingsPage({
                   </div>
 
                   {/* ToolExecutor Agent Configuration */}
-                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

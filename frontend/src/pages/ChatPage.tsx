@@ -601,7 +601,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="absolute right-2 bottom-2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg transition-colors text-white"
               >
                 {isLoading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />

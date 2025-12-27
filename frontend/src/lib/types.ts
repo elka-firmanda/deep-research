@@ -6,6 +6,22 @@ export interface Message {
   isError?: boolean
 }
 
+export interface DatabaseConnection {
+  name: string  // Connection name (e.g., "Production DB")
+  type: 'bigquery' | 'postgres' | 'clickhouse' | 'mysql'
+  host?: string
+  port?: number
+  database?: string
+  username?: string
+  password?: string
+  // BigQuery specific
+  project_id?: string
+  credentials_json?: string
+  // Additional connection options
+  ssl?: boolean
+  options?: Record<string, string>
+}
+
 export interface Settings {
   provider: string
   model: string
@@ -28,6 +44,16 @@ export interface Settings {
   masterAgentSystemPrompt?: string  // System prompt for MasterAgent
   plannerAgentSystemPrompt?: string  // System prompt for PlannerAgent
   searchScraperAgentSystemPrompt?: string  // System prompt for SearchScraperAgent
+  // API Keys (configurable via settings)
+  tavilyApiKey?: string  // Tavily API key for web search
+  serpapiApiKey?: string  // SerpAPI key for Google search
+  apifyApiKey?: string  // Apify API key for web scraping
+  // Database connections
+  databaseConnections?: DatabaseConnection[]  // Database connection configurations
+  // Database agent configuration
+  databaseAgentProvider?: string  // Provider for DatabaseAgent
+  databaseAgentModel?: string  // Model for DatabaseAgent
+  databaseAgentSystemPrompt?: string  // System prompt for DatabaseAgent
 }
 
 export interface ProviderInfo {

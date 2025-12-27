@@ -3,6 +3,7 @@ from .serpapi_search import SerpApiSearchTool
 from .deep_search import DeepSearchTool
 from .web_scraper import WebScraperTool
 from .datetime_tool import DateTimeTool
+from .database_tool import DatabaseTool
 from .base import BaseTool, ToolResult
 
 __all__ = [
@@ -11,6 +12,7 @@ __all__ = [
     "DeepSearchTool",
     "WebScraperTool",
     "DateTimeTool",
+    "DatabaseTool",
     "BaseTool",
     "ToolResult",
 ]
