@@ -512,7 +512,7 @@ export default function SettingsPage({
             {settings.multiAgentMode && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-300">Agent Configuration</h3>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Agent Configuration</h3>
                   <button
                     onClick={() => onSettingsChange({
                       ...settings,
@@ -525,7 +525,7 @@ export default function SettingsPage({
                       toolExecutorAgentModel: undefined,
                       toolExecutorAgentProvider: undefined,
                     })}
-                    className="text-xs text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"
+                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors flex items-center gap-1"
                     title="Reset all agents to use main provider and model"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -533,27 +533,27 @@ export default function SettingsPage({
                   </button>
                 </div>
 
-                <p className="text-xs text-gray-400 mb-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                   Optimize cost and performance by assigning different providers and models to each agent. Leave empty to use the main settings.
                 </p>
 
                 <div className="space-y-4">
                   {/* Master Agent Configuration */}
-                  <div className="bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Master Agent
                         </label>
                         <p className="text-xs text-gray-500">
                           Orchestrates subagents and synthesizes final responses
                         </p>
                       </div>
-                      <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Provider</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
                         <select
                           value={settings.masterAgentProvider || ''}
                           onChange={(e) => {
@@ -563,7 +563,7 @@ export default function SettingsPage({
                               masterAgentModel: undefined, // Reset model when provider changes
                             })
                           }}
-                          className="w-full h-[42px] bg-gray-600 border border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="">Use main provider ({settings.provider || 'none'})</option>
                           {availableProviders.map((provider) => (
@@ -574,7 +574,7 @@ export default function SettingsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Model</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
                         <SearchableSelect
                           options={masterAgentModelOptions}
                           value={settings.masterAgentModel || ''}
@@ -584,33 +584,33 @@ export default function SettingsPage({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">System Prompt (Optional)</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">System Prompt (Optional)</label>
                         <textarea
                           value={settings.masterAgentSystemPrompt || ''}
                           onChange={(e) => onSettingsChange({ ...settings, masterAgentSystemPrompt: e.target.value || undefined })}
                           placeholder="Leave empty to use default synthesis prompt"
-                          className="w-full h-20 bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                          className="w-full h-20 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Planner Agent Configuration */}
-                  <div className="bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Planner Agent
                         </label>
                         <p className="text-xs text-gray-500">
                           Creates step-by-step research plans for complex queries
                         </p>
                       </div>
-                      <Layers className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                      <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Provider</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
                         <select
                           value={settings.plannerAgentProvider || ''}
                           onChange={(e) => {
@@ -620,7 +620,7 @@ export default function SettingsPage({
                               plannerAgentModel: undefined,
                             })
                           }}
-                          className="w-full h-[42px] bg-gray-600 border border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="">Use main provider ({settings.provider || 'none'})</option>
                           {availableProviders.map((provider) => (
@@ -631,7 +631,7 @@ export default function SettingsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Model</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
                         <SearchableSelect
                           options={plannerAgentModelOptions}
                           value={settings.plannerAgentModel || ''}
@@ -641,33 +641,33 @@ export default function SettingsPage({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">System Prompt (Optional)</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">System Prompt (Optional)</label>
                         <textarea
                           value={settings.plannerAgentSystemPrompt || ''}
                           onChange={(e) => onSettingsChange({ ...settings, plannerAgentSystemPrompt: e.target.value || undefined })}
                           placeholder="Leave empty to use default planning prompt"
-                          className="w-full h-20 bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                          className="w-full h-20 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* SearchScraper Agent Configuration */}
-                  <div className="bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           SearchScraper Agent
                         </label>
                         <p className="text-xs text-gray-500">
                           Executes web searches and scrapes content from sources
                         </p>
                       </div>
-                      <Search className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                      <Search className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Provider</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
                         <select
                           value={settings.searchScraperAgentProvider || ''}
                           onChange={(e) => {
@@ -677,7 +677,7 @@ export default function SettingsPage({
                               searchScraperAgentModel: undefined,
                             })
                           }}
-                          className="w-full h-[42px] bg-gray-600 border border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="">Use main provider ({settings.provider || 'none'})</option>
                           {availableProviders.map((provider) => (
@@ -688,7 +688,7 @@ export default function SettingsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Model</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
                         <SearchableSelect
                           options={searchScraperAgentModelOptions}
                           value={settings.searchScraperAgentModel || ''}
@@ -698,33 +698,33 @@ export default function SettingsPage({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">System Prompt (Optional)</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">System Prompt (Optional)</label>
                         <textarea
                           value={settings.searchScraperAgentSystemPrompt || ''}
                           onChange={(e) => onSettingsChange({ ...settings, searchScraperAgentSystemPrompt: e.target.value || undefined })}
                           placeholder="Leave empty to use default search/synthesis prompt"
-                          className="w-full h-20 bg-gray-600 border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                          className="w-full h-20 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* ToolExecutor Agent Configuration */}
-                  <div className="bg-gray-700/50 rounded-lg p-3">
+                  <div className="bg-gray-200/50 dark:bg-gray-700/50 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           ToolExecutor Agent
                         </label>
                         <p className="text-xs text-gray-500">
                           Handles utility tools (datetime, calculator, etc.)
                         </p>
                       </div>
-                      <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                      <Wrench className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Provider</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
                         <select
                           value={settings.toolExecutorAgentProvider || ''}
                           onChange={(e) => {
@@ -734,7 +734,7 @@ export default function SettingsPage({
                               toolExecutorAgentModel: undefined,
                             })
                           }}
-                          className="w-full h-[42px] bg-gray-600 border border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         >
                           <option value="">Use main provider ({settings.provider || 'none'})</option>
                           {availableProviders.map((provider) => (
@@ -745,7 +745,7 @@ export default function SettingsPage({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Model</label>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
                         <SearchableSelect
                           options={toolExecutorAgentModelOptions}
                           value={settings.toolExecutorAgentModel || ''}

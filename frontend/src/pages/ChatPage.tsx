@@ -477,7 +477,7 @@ export default function ChatPage({ settings, apiStatus }: ChatPageProps) {
             {/* Spacer for sidebar toggle button when closed */}
             {!sidebarOpen && <div className="w-10" />}
             <div className="p-1.5 sm:p-2 bg-blue-600 rounded-lg">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-semibold">AI Research Agent</h1>
