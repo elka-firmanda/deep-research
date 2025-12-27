@@ -1068,6 +1068,72 @@ export default function SettingsPage({
                 </div>
               </div>
             )}
+
+            {/* Database Agent Configuration (shown when database connections exist) */}
+            {settings.databaseConnections && settings.databaseConnections.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Database Agent (Optional)</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  Configure a dedicated agent for database queries when using multi-agent mode. Leave empty to use main settings.
+                </p>
+
+                <div className="bg-white dark:bg-gray-700/50 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Database Agent
+                      </label>
+                      <p className="text-xs text-gray-500">
+                        Generates SQL queries and analyzes database results
+                      </p>
+                    </div>
+                    <Database className="w-4 h-4 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Provider</label>
+                      <select
+                        value={settings.databaseAgentProvider || ''}
+                        onChange={(e) => {
+                          onSettingsChange({
+                            ...settings,
+                            databaseAgentProvider: e.target.value || undefined,
+                            databaseAgentModel: undefined,
+                          })
+                        }}
+                        className="w-full h-[42px] bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      >
+                        <option value="">Use main provider ({settings.provider || 'none'})</option>
+                        {availableProviders.map((provider) => (
+                          <option key={provider.name} value={provider.name}>
+                            {provider.name.charAt(0).toUpperCase() + provider.name.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Model</label>
+                      <SearchableSelect
+                        options={modelOptions}
+                        value={settings.databaseAgentModel || ''}
+                        onChange={(model) => onSettingsChange({ ...settings, databaseAgentModel: model })}
+                        placeholder={settings.model ? `${settings.model} (main)` : "Use main model"}
+                        isLoading={isLoadingModels}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">System Prompt (Optional)</label>
+                      <textarea
+                        value={settings.databaseAgentSystemPrompt || ''}
+                        onChange={(e) => onSettingsChange({ ...settings, databaseAgentSystemPrompt: e.target.value || undefined })}
+                        placeholder="Leave empty to use default SQL generation prompt"
+                        className="w-full h-20 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono resize-y"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Timezone Section */}
